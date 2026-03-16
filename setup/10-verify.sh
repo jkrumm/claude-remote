@@ -24,10 +24,18 @@ run_as_user() {
 
 echo ""
 echo "=== User isolation ==="
-run_as_user 'docker ps' 2>&1 | grep -qi "denied\|not found\|permission\|connect\|socket" \
-  && check "docker blocked" "ok" || check "docker accessible" "fail" "SECURITY ISSUE"
-sudo -u claude-remote sudo whoami 2>&1 | grep -qi "denied\|not permitted\|not allowed\|sudoers\|password" \
-  && check "sudo blocked" "ok" || check "sudo accessible" "fail" "SECURITY ISSUE"
+# Check docker: claude-remote should not be in the docker group
+if id -nG claude-remote | grep -qw docker; then
+  check "docker blocked" "fail" "claude-remote is in docker group — SECURITY ISSUE"
+else
+  check "docker blocked" "ok" "not in docker group"
+fi
+# Check sudo: claude-remote should have no sudo privileges
+if sudo -u claude-remote sudo -l 2>&1 | grep -q "may run\|NOPASSWD"; then
+  check "sudo blocked" "fail" "claude-remote has sudo privileges — SECURITY ISSUE"
+else
+  check "sudo blocked" "ok" "no sudo privileges"
+fi
 [[ -d /home/claude-remote/SourceRoot ]] \
   && check "SourceRoot exists" "ok" || check "SourceRoot missing" "fail"
 

@@ -13,8 +13,9 @@ else
 fi
 
 # Allow the invoking admin user to su without password (idempotent)
+# Use SUDO_USER to get the real caller, not root
 SUDOERS_FILE="/etc/sudoers.d/claude-remote-su"
-ADMIN_USER="$(whoami)"
+ADMIN_USER="${SUDO_USER:-$(whoami)}"
 if [[ ! -f "$SUDOERS_FILE" ]]; then
   echo "$ADMIN_USER ALL=($USERNAME) NOPASSWD: ALL" | sudo tee "$SUDOERS_FILE" > /dev/null
   sudo chmod 440 "$SUDOERS_FILE"
