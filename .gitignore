@@ -1,0 +1,15 @@
+# Node / Bun
+node_modules/
+dist/
+bun.lock
+
+# Secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+*.swp
+*.swo
+Thumbs.db
