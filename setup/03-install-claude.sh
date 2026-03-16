@@ -19,7 +19,9 @@ fi
 SKILLS_DST="/home/$USERNAME/.claude/skills"
 sudo -u "$USERNAME" mkdir -p "$SKILLS_DST"
 
-SKILLS_SRC="$REPO_DIR/skills"
+SKILLS_SRC="/home/$USERNAME/SourceRoot/claude-remote/skills"
+# Fallback: relative to this script's repo (when run directly, not via sudo)
+[[ -d "$SKILLS_SRC" ]] || SKILLS_SRC="$REPO_DIR/skills"
 if [[ -d "$SKILLS_SRC" ]] && compgen -G "$SKILLS_SRC/*.md" > /dev/null; then
   for skill in "$SKILLS_SRC"/*.md; do
     sudo cp "$skill" "$SKILLS_DST/$(basename "$skill")"
@@ -31,7 +33,8 @@ else
 fi
 
 # CLAUDE.md — install as the user's global Claude context
-CLAUDE_MD_SRC="$REPO_DIR/CLAUDE.md"
+CLAUDE_MD_SRC="/home/$USERNAME/SourceRoot/claude-remote/CLAUDE.md"
+[[ -f "$CLAUDE_MD_SRC" ]] || CLAUDE_MD_SRC="$REPO_DIR/CLAUDE.md"
 CLAUDE_MD_DST="/home/$USERNAME/.claude/CLAUDE.md"
 sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.claude"
 if [[ -f "$CLAUDE_MD_SRC" ]]; then
@@ -41,7 +44,8 @@ if [[ -f "$CLAUDE_MD_SRC" ]]; then
 fi
 
 # Theme
-THEME_SRC="$REPO_DIR/config/claude-code-theme.json"
+THEME_SRC="/home/$USERNAME/SourceRoot/claude-remote/config/claude-code-theme.json"
+[[ -f "$THEME_SRC" ]] || THEME_SRC="$REPO_DIR/config/claude-code-theme.json"
 THEME_DST="/home/$USERNAME/.claude/theme.json"
 if [[ -f "$THEME_SRC" ]]; then
   # Only install if it's not the placeholder
