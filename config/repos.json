@@ -1,0 +1,10 @@
+{
+  "_comment": "List of repos to clone into ~/SourceRoot/. SSH URLs require the deploy key to be added to each repo first (see MANUAL_TODOS.md M-02).",
+  "repos": [
+    {
+      "name": "basalt-ui",
+      "ssh_url": "git@github.com:jkrumm/basalt-ui.git",
+      "description": "Primary test repo for validating the setup"
+    }
+  ]
+}
