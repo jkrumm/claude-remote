@@ -58,6 +58,20 @@ done
 echo ""
 echo "Stack status:"
 docker compose -f "$REPO_ROOT/docker/docker-compose.yml" ps 2>/dev/null || true
+
+# Build the nanoclaw-agent image (required for NanoClaw to spawn Claude agent containers).
+# This is a large image (~5 min on first build — Node 22 + Chromium + Claude CLI).
+NANOCLAW_AGENT_CONTEXT="$REPO_ROOT/nanoclaw/container"
+if [[ -d "$NANOCLAW_AGENT_CONTEXT" ]]; then
+  echo ""
+  echo "Building nanoclaw-agent:latest (NanoClaw Claude agent container image)..."
+  echo "  This may take ~5 minutes on first build (Chromium install)."
+  docker build -t nanoclaw-agent:latest "$NANOCLAW_AGENT_CONTEXT"
+  echo "  [ok] nanoclaw-agent:latest built"
+else
+  echo "  [skip] nanoclaw/container/ not found — skipping nanoclaw-agent build"
+fi
+
 echo ""
 echo "Docker Compose setup complete."
-echo "Note: claude-remote-api and nanoclaw require M-03 (Doppler prod secrets) before starting."
+echo "Note: full stack (api, nanoclaw, vibekanban) requires M-03 (Doppler prod secrets) before starting."

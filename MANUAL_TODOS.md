@@ -7,18 +7,6 @@ Check off items as you complete them.
 
 ## Pending
 
-### M-01: Claude Code OAuth for claude-remote user
-**Why it's manual**: OAuth requires an interactive browser session
-**Command/Action**:
-```bash
-ssh cr
-claude auth login
-# Follow the browser URL that appears
-```
-**Status**: DONE ✓
-
----
-
 ### M-02: gh CLI auth for claude-remote user
 **Why it's manual**: Requires creating a GitHub fine-grained PAT in the browser
 **Command/Action**:
@@ -36,11 +24,76 @@ PAT permissions required:
 
 ---
 
-### M-03: Populate Doppler prod config
-**Why it's manual**: Requires knowing your actual secret values
+### M-07: Register Telegram channel in NanoClaw
+**Why it's manual**: Requires the bot to be running and your Telegram chat ID
 **Command/Action**:
-Populate the `prod` config with all secrets needed by the compose stack.
+1. Start the Docker stack (`./scripts/dc-up.sh`)
+2. Message your bot on Telegram: `/chatid`
+3. It replies with your ID in format `tg:XXXXXXXXX`
+4. Register it as the main channel:
+```bash
+# On homelab, with the nanoclaw container running:
+docker exec claude-remote-nanoclaw node dist/index.js register tg:XXXXXXXXX "Your Name" main
+```
+After registration, trigger the bot with `@Andy <message>` (or whatever `ASSISTANT_NAME` you set).
+**Status**: DONE ✓
+
+---
+
+### M-08: Build nanoclaw-agent Docker image
+**Why it's manual**: Large image (~5 min, needs Chromium) — not pulled from a registry
+**Command/Action**:
+```bash
+ssh homelab
+cd ~/SourceRoot/claude-remote
+docker build -t nanoclaw-agent:latest nanoclaw/container/
+```
+This image is required before NanoClaw can spawn any agent containers. Rebuild whenever `nanoclaw/container/Dockerfile` or `nanoclaw/container/agent-runner/` changes.
+**Status**: DONE ✓
+
+---
+
+### M-09: Optional — Reverse proxy DNS setup
+**Why it's manual**: Requires your DNS provider and Caddy/reverse proxy config
+**What this gives you**: Clean HTTPS URLs for vibekanban and claude-remote-api over Tailscale, instead of SSH tunnels
+
+1. Add DNS A records pointing to your Tailscale IP:
+   - `<your-domain>/vibekanban` or `claude-remote.<your-domain>` → Tailscale IP
+   - `claude-remote-api.<your-domain>` → Tailscale IP
+2. Add Caddy blocks (on homelab network) in your Caddyfile:
+   ```
+   claude-remote.<your-domain>, http://claude-remote.<your-domain> {
+       reverse_proxy claude-remote-vibekanban:8081
+   }
+   claude-remote-api.<your-domain>, http://claude-remote-api.<your-domain> {
+       reverse_proxy claude-remote-api:4000
+   }
+   ```
+3. Set `VIBEKANBAN_PUBLIC_URL=https://claude-remote.<your-domain>` in Doppler if using GitHub OAuth with vibekanban
+4. Update vibekanban GitHub OAuth app callback URL to `https://claude-remote.<your-domain>/v1/oauth/github/callback`
+
+Note: DNS records should be Tailscale-IP-only (no public exposure). Caddy handles TLS via DNS-01 challenge.
+**Status**: DONE ✓
+
+---
+
+## Completed
+
+- **M-01**: Claude Code OAuth for claude-remote user (`claude auth login`) ✓
+- **M-03**: Doppler prod config populated with all secrets ✓
+- **M-04**: NanoClaw Telegram bot created via @BotFather, `TELEGRAM_BOT_TOKEN` set in Doppler ✓
+- **M-05**: Docker stack started and verified (`./scripts/dc-up.sh` + `./setup/10-verify.sh`) ✓
+- **M-06**: Vibekanban GitHub OAuth app created, Doppler secrets set, setup script run ✓
+- **M-07**: Telegram channel registered as main NanoClaw channel ✓
+- **M-08**: `nanoclaw-agent:latest` Docker image built on homelab ✓
+- **M-09**: Cloudflare DNS + Caddy reverse proxy configured for claude-remote domains ✓
+
+---
+
+## Reference: Doppler secrets needed
+
 Run from your Mac (Doppler CLI authenticated):
+
 ```bash
 doppler secrets set \
   POSTGRES_PASSWORD=<strong-random-password> \
@@ -49,69 +102,11 @@ doppler secrets set \
   TICKTICK_CLIENT_ID=<see-ticktick-developer-settings> \
   TICKTICK_CLIENT_SECRET=<see-ticktick-developer-settings> \
   CLAUDE_REMOTE_API_SECRET=$(openssl rand -hex 32) \
-  --project claude-remote --config prod
-```
-`TELEGRAM_BOT_TOKEN` is added separately in M-04. Vibekanban secrets are added in M-06. `HOMELAB_NETWORK_NAME` defaults to `homelab_cloudflared` in compose — only set if yours differs.
-**Status**: DONE ✓
-
----
-
-### M-04: NanoClaw Telegram bot setup
-**Why it's manual**: Requires creating a Telegram bot via BotFather
-**Command/Action**:
-1. Message @BotFather on Telegram: `/newbot`
-2. Name: `ClaudeRemote`, username: `<something>_bot`
-3. Copy the token
-4. Store: `doppler secrets set TELEGRAM_BOT_TOKEN=<token> --project claude-remote --config prod`
-**Status**: PENDING
-
----
-
-### M-05: Start Docker stack and verify
-**Why it's manual**: Requires M-03 + M-04 to be complete first
-**Command/Action**:
-```bash
-ssh homelab
-cd ~/SourceRoot/claude-remote
-./scripts/dc-up.sh
-./setup/10-verify.sh
-```
-**Status**: PENDING
-
----
-
-### M-06: Vibekanban GitHub OAuth app
-**Why it's manual**: Only the GitHub OAuth app requires a browser — everything else is automated by `setup/09b-vibekanban.sh`
-
-**Step 1 — Create GitHub OAuth App** (in the browser):
-1. Go to GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
-2. Application name: `VibeKanban (homelab)`
-3. Homepage URL: `http://localhost:3000`
-4. Authorization callback URL: `http://localhost:3000/api/auth/github/callback`
-5. Copy the Client ID and generate a Client Secret
-
-**Step 2 — Add Doppler secrets** (from your Mac):
-```bash
-doppler secrets set \
+  TELEGRAM_BOT_TOKEN=<from-botfather> \
   VIBEKANBAN_JWT_SECRET=$(openssl rand -hex 32) \
-  VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID=<client-id-from-step-1> \
-  VIBEKANBAN_GITHUB_OAUTH_CLIENT_SECRET=<client-secret-from-step-1> \
+  VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID=<from-github> \
+  VIBEKANBAN_GITHUB_OAUTH_CLIENT_SECRET=<from-github> \
   --project claude-remote --config prod
 ```
 
-**Step 3 — Run the setup script** (handles repo clone, database, MCP config, build):
-```bash
-ssh homelab
-cd ~/SourceRoot/claude-remote
-bash setup/09b-vibekanban.sh
-```
-
-First build takes ~10 minutes (Rust + Node.js). Access via SSH tunnel:
-`ssh -L 3000:localhost:3000 homelab` → open `http://localhost:3000`
-**Status**: PENDING
-
----
-
-## Completed
-
-- M-01: Claude Code OAuth ✓
+See [docs/doppler.md](docs/doppler.md) for the full secrets reference.

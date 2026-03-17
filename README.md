@@ -59,7 +59,7 @@ These require browser access or external services and cannot be automated:
 | **Doppler auth** | On the host: `doppler login` then populate secrets (see MANUAL_TODOS.md M-03) |
 | **gh CLI auth** | Run `sudo bash setup/06-setup-gh-cli.sh` — guided PAT setup (see MANUAL_TODOS.md M-02) |
 | **Add repos** | Edit `config/repos.json`, then re-run `./setup/07-clone-repos.sh` |
-| **NanoClaw Telegram bot** | Create via @BotFather, store token in Doppler (see MANUAL_TODOS.md M-04) |
+| **NanoClaw Telegram bot** | Create via @BotFather, store token in Doppler, then register channel (see MANUAL_TODOS.md M-04, M-07) |
 | **Vibekanban** | Clone repo, create GitHub OAuth app, add Doppler secrets (see MANUAL_TODOS.md M-06) |
 
 See [MANUAL_TODOS.md](MANUAL_TODOS.md) for the full checklist with exact commands.
@@ -70,7 +70,7 @@ See [MANUAL_TODOS.md](MANUAL_TODOS.md) for the full checklist with exact command
 ./scripts/dc-up.sh
 ```
 
-This starts: Postgres, Valkey, claude-remote-api, NanoClaw, Vibekanban, ElectricSQL, Azurite, and Watchtower.
+This starts: Postgres, Valkey, claude-remote-api, NanoClaw, docker-proxy, Vibekanban, ElectricSQL, and Azurite.
 
 ### 5. Verify
 
@@ -107,15 +107,16 @@ launch <repo-name>
 │  │                                              │   │
 │  │  claude-remote user (no sudo, no docker)     │   │
 │  │  ├── Claude Code interactive (tmux)          │   │
-│  │  ├── Headless agents (Agent SDK, worktrees)  │   │
+│  │  ├── Headless agents (Vibekanban, worktrees) │   │
 │  │  └── ~/SourceRoot/<repos>                    │   │
 │  │                                              │   │
 │  │  Docker (agent-net):                         │   │
 │  │  ├── claude-remote-api  :4000                │   │
 │  │  ├── vibekanban          :3000               │   │
-│  │  ├── electric (sync)                         │   │
+│  │  ├── electric (sync engine)                  │   │
 │  │  ├── azurite (blob store)                    │   │
-│  │  ├── nanoclaw (Telegram bot)                 │   │
+│  │  ├── nanoclaw (Telegram bot) :3001 (proxy)  │   │
+│  │  ├── docker-proxy (socket limiter)           │   │
 │  │  ├── postgres           :5432 (localhost)    │   │
 │  │  └── valkey             :6379 (localhost)    │   │
 │  └──────────────────────────────────────────────┘   │
@@ -125,7 +126,11 @@ launch <repo-name>
 └──────────────────────────────────────────────────────┘
 ```
 
-Ports 4000, 5432, and 6379 are bound to `127.0.0.1` only. Port 3000 (vibekanban) is also localhost-only — access via SSH tunnel: `ssh -L 3000:localhost:3000 homelab`. The `claude-remote-api` container is dual-homed (agent-net + homelab network) so it can reach NTFY on the host network; all other containers are on agent-net only.
+Ports 4000, 5432, and 6379 are bound to `127.0.0.1` only. Port 3000 (vibekanban) is localhost-only — access via SSH tunnel (`ssh -L 3000:localhost:3000 homelab`) or a reverse proxy if you have one (see Optional DNS setup below).
+
+`claude-remote-api` and `vibekanban` are dual-homed (agent-net + homelab network) so a Caddy instance on the homelab network can reverse-proxy them with TLS. All other containers are on agent-net only.
+
+**NanoClaw Docker-in-Docker note:** NanoClaw runs inside Docker but spawns Claude agent containers via the host Docker daemon through a socket proxy. Its data directory is a bind mount (not a named volume) at `/home/claude-remote/nanoclaw-data` so that the host Docker daemon can resolve bind mount paths. Port 3001 is the credential proxy — published so that spawned agent containers (on the default bridge) can reach it via `host.docker.internal:3001`. Agent containers receive only a placeholder token; the proxy injects the real OAuth token on each request, reading it fresh from the mounted credentials file so token auto-refreshes are picked up without restarting NanoClaw.
 
 ---
 
@@ -150,14 +155,27 @@ ssh -L 3000:localhost:3000 homelab
 # then open http://localhost:3000 in your browser
 ```
 
+Or expose it via a reverse proxy with Tailscale DNS (see Optional DNS Setup below).
+
 Create tasks in the UI and Vibekanban launches Claude Code in a git worktree. When done, it pushes a branch and creates a PR. You can also connect Claude Code in your tmux session to Vibekanban via MCP (see MANUAL_TODOS.md M-06).
 
 ### NanoClaw (Telegram)
 
-Message `@<your-bot>` on Telegram to:
-- Get a task summary from TickTick
-- Trigger headless agents on a repo
-- Ask questions about repo status
+NanoClaw is a **personal assistant** bot — not a coding agent. It runs Claude in ephemeral containers (one per message) and is good at:
+- Answering questions, summaries, reminders
+- Looking things up and reasoning about tasks
+- Delegating coding work to Vibekanban (create a task, which Vibekanban picks up)
+
+Trigger it by starting your message with `@<ASSISTANT_NAME>` (default: `@Andy`).
+
+Before it responds, you must register your Telegram chat as the main channel. Send `/chatid` to the bot — it replies with your chat ID in the format `tg:XXXXXXXXX`. Then register it:
+```bash
+# Inside the nanoclaw container
+docker exec -it claude-remote-nanoclaw node dist/index.js register tg:XXXXXXXXX Johannes main
+```
+Or use the `/setup` Claude Code skill inside the nanoclaw source directory.
+
+NanoClaw skills live in `nanoclaw/container/skills/` — intentionally separate from the tmux/Vibekanban skills in `skills/`. NanoClaw agents should not commit code or manage repos directly.
 
 ### Send a notification
 
@@ -169,6 +187,24 @@ curl -X POST http://localhost:4000/api/notify \
   -H "Content-Type: application/json" \
   -d '{"message": "Task done", "title": "ClaudeRemote", "priority": 3}'
 ```
+
+---
+
+## Optional: DNS + Reverse Proxy
+
+If your homelab runs Caddy (or another reverse proxy) on a shared Docker network, you can expose `vibekanban` and `claude-remote-api` via clean HTTPS URLs accessible only over Tailscale.
+
+**Pattern:**
+1. Add a Tailscale-only DNS A record for `<service>.<your-domain>` pointing to your Tailscale IP
+2. Add a Caddy block on the homelab network:
+   ```
+   <service>.<your-domain> {
+       reverse_proxy <container-name>:<port>
+   }
+   ```
+3. Caddy uses DNS-01 challenge (Cloudflare plugin) to issue certs for private subdomains
+
+The `vibekanban` and `claude-remote-api` containers are already on both `agent-net` and the `homelab` external network in docker-compose.yml, so Caddy can reach them by container name without further changes. No public exposure — DNS records point to the Tailscale IP only.
 
 ---
 
@@ -207,9 +243,17 @@ See [docs/doppler.md](docs/doppler.md) for the full secrets reference.
 | Task | How |
 |-|-|
 | Add repos | Edit `config/repos.json`, re-run `./setup/07-clone-repos.sh` |
-| Add Claude Code skills | Add `.md` files to `skills/`, re-run `./setup/03-install-claude.sh` |
+| Add tmux/Vibekanban skills | Add `.md` files to `skills/` — symlinked to `~/.claude/skills/`, active immediately |
+| Add NanoClaw agent skills | Add `.md` files to `nanoclaw/container/skills/` — synced into each group's session on next agent run |
 | Replace Claude theme | `claude theme export > config/claude-code-theme.json`, re-run `./setup/03-install-claude.sh` |
 | Add tmux layouts | Add scripts to `tmux/layouts/`, reference in `tmux/launch.sh` |
+| Change NanoClaw trigger word | Set `ASSISTANT_NAME=<name>` in Doppler and restart nanoclaw |
+
+**Two skill sets, intentionally separate:**
+- `skills/` — for tmux sessions and Vibekanban agents (coding skills: `/commit`, `/pr`, etc.)
+- `nanoclaw/container/skills/` — for NanoClaw agents (assistant skills: `/debug`, `/setup`)
+
+`skills/` is symlinked to `/home/claude-remote/.claude/skills/` by `setup/09c-setup-claude-config.sh`, so a `git pull` in the repo is all it takes to update available skills for live sessions. `CLAUDE.md` is similarly symlinked to `~/.claude/CLAUDE.md`.
 
 ---
 
@@ -217,8 +261,8 @@ See [docs/doppler.md](docs/doppler.md) for the full secrets reference.
 
 ```
 claude-remote/
-├── setup.sh                  # Main entry point — runs all setup/ scripts
-├── CLAUDE.md                 # Claude Code global context for the claude-remote user
+├── setup.sh                  # Main entry point — runs all setup/ scripts in order
+├── CLAUDE.md                 # Claude Code context — symlinked to ~/.claude/CLAUDE.md
 ├── MANUAL_TODOS.md           # Steps requiring human intervention
 ├── config/
 │   ├── repos.json            # Repos to clone for the claude-remote user
@@ -232,29 +276,41 @@ claude-remote/
 │   │   └── generated/        # TickTick OpenAPI SDK (auto-generated)
 │   ├── Dockerfile
 │   └── package.json
+├── nanoclaw/                 # NanoClaw Telegram bot (vendored, customizable)
+│   ├── src/                  # NanoClaw source (TypeScript)
+│   │   ├── credential-proxy.ts # HTTP proxy — injects real OAuth token per request
+│   │   ├── container-runner.ts # Spawns Claude agent containers via Docker
+│   │   └── config.ts         # Includes toHostMountPath() for DinD bind mount fix
+│   ├── container/
+│   │   ├── Dockerfile        # nanoclaw-agent image (Node 22 + Chromium + Claude CLI)
+│   │   ├── agent-runner/     # TypeScript agent runner compiled into each container
+│   │   └── skills/           # NanoClaw-specific Claude skills (not shared with tmux)
+│   ├── Dockerfile            # NanoClaw service image
+│   └── entrypoint.sh        # Extracts OAuth token from credentials file at startup
 ├── docker/
-│   └── docker-compose.yml   # Postgres, Valkey, api, vibekanban, electric, azurite, nanoclaw, watchtower
-├── skills/                   # Claude Code skills (copied to ~/.claude/skills/)
-│   ├── api-bridge.md
+│   └── docker-compose.yml   # Postgres, Valkey, api, nanoclaw, docker-proxy, vibekanban, electric, azurite
+├── skills/                   # tmux + Vibekanban Claude Code skills
+│   ├── api-bridge.md         # Symlinked to ~/.claude/skills/ by setup/09c
 │   ├── notify.md
-│   ├── trigger-agent.md
 │   ├── commit.md
 │   └── pr.md
 ├── scripts/
 │   ├── notify.sh             # Quick NTFY notification sender
-│   ├── dc-up.sh              # Docker Compose up
+│   ├── dc-up.sh              # Docker Compose up (via Doppler)
 │   └── dc-down.sh            # Docker Compose down
 ├── setup/
 │   ├── 01-create-user.sh     # Create claude-remote system user
 │   ├── 02-install-deps.sh    # nvm, Bun, tools (per-user for claude-remote)
-│   ├── 03-install-claude.sh  # Claude Code CLI + skills + theme
+│   ├── 03-install-claude.sh  # Claude Code CLI + theme
 │   ├── 04-setup-doppler.sh   # Doppler CLI
 │   ├── 05-setup-ssh-keys.sh  # SSH key for claude-remote user
-│   ├── 06-setup-gh-cli.sh    # gh CLI
+│   ├── 06-setup-gh-cli.sh    # gh CLI (guided PAT setup)
 │   ├── 07-clone-repos.sh     # Clone repos from config/repos.json
-│   ├── 08-setup-shell-env.sh # zsh, tmux config, shell aliases
-│   ├── 09-docker-compose.sh  # Pull Docker images
-│   └── 10-verify.sh          # Verification checks
+│   ├── 08-setup-shell-env.sh # zsh/bash config, tmux, shell aliases
+│   ├── 09-docker-compose.sh  # Pull Docker images, build nanoclaw-agent
+│   ├── 09b-vibekanban.sh     # Vibekanban repo clone + DB + MCP config
+│   ├── 09c-setup-claude-config.sh # Symlink skills/ and CLAUDE.md into ~/.claude/
+│   └── 10-verify.sh          # Verification checks (user, tools, stack, skills)
 └── tmux/
     ├── tmux.conf             # tmux config (Ctrl+A prefix, hjkl nav, Claude popup)
     ├── launch.sh             # Session launcher (symlinked to ~/launch)
