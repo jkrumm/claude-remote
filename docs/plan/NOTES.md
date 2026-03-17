@@ -41,3 +41,22 @@ None (validated with shell loop checking file presence + python3 JSON parse for 
 `skills/commit.md` and `skills/pr.md` are intentionally minimal — they document environment conventions rather than automating git commands. The `config/local-skills/` overlay (section 9.3) was not created — it's optional and can be added when needed.
 
 ---
+
+## Group 7: Agent SDK & Headless Trigger System
+
+### What was implemented
+`agents/package.json` + `tsconfig.json`, `agents/src/trigger-handler.ts` (Agent SDK runner with worktree support, PR creation, NTFY notification), three prompt templates (`generic-fix.md`, `pr-review.md`, `daily-triage.md`), `scripts/spawn-headless.sh`, `scripts/notify.sh`.
+
+### Deviations from prompt
+Agent SDK API verified via Context7 — `query()` takes `{ prompt, options }` with `permissionMode: 'bypassPermissions'` and requires `allowDangerouslySkipPermissions: true` alongside it (both are needed, not just one). The `SDKResultMessage` has a `subtype` field (`"success"` vs `"error_*"`) for distinguishing outcome. Pinned resolved versions in `package.json` after `bun install` resolved `latest`.
+
+### Gotchas & surprises
+Bun was not yet installed for the `claude-remote` user — had to run `02-install-deps.sh` before the typecheck step on homelab could pass. `sudo -u claude-remote bash -c '...'` doesn't source `.bashrc`, so `bun` isn't in PATH unless `BUN_INSTALL` is set explicitly in the command. The `08-setup-shell-env.sh` script now auto-pulls the claude-remote user's repo, but jkrumm's copy must be pulled first (bootstrap problem on first deploy of the new version). The PR creation in `trigger-handler.ts` tries `develop` first, falls back to `main` — matches the project git workflow.
+
+### Tests added
+None (shell syntax via `bash -n`, TypeScript via `bun run typecheck` — passes on both local and homelab).
+
+### Future improvements
+`spawn-headless.sh` currently passes `--worktree true/false` as a string arg; `trigger-handler.ts` checks `!== "false"` to handle this. Could be cleaner with a proper CLI arg parser. The `createPr` function uses a hardcoded commit message prefix — prompt templates should instruct the agent to commit with a meaningful message before the script pushes. The `bun.lock` file is gitignored globally but should probably be tracked in `agents/` — worth revisiting when `claude-remote-api` is added.
+
+---
