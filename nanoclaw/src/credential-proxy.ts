@@ -9,7 +9,12 @@
  *             API key via /api/oauth/claude_cli/create_api_key.
  *             Proxy injects real OAuth token on that exchange request;
  *             subsequent requests carry the temp key which is valid as-is.
+ *
+ * Credentials are re-read from the live credentials file on every request
+ * so that OAuth token refreshes (performed by the running claude CLI) are
+ * picked up immediately without restarting nanoclaw.
  */
+import fs from 'fs';
 import { createServer, Server } from 'http';
 import { request as httpsRequest } from 'https';
 import { request as httpRequest, RequestOptions } from 'http';
@@ -23,33 +28,57 @@ export interface ProxyConfig {
   authMode: AuthMode;
 }
 
-export function startCredentialProxy(
-  port: number,
-  host = '127.0.0.1',
-): Promise<Server> {
+/**
+ * Read the freshest available credentials.
+ * Priority: live credentials file (updated by claude CLI) → .env → process.env
+ */
+function readLiveCredentials(): { apiKey?: string; oauthToken?: string } {
+  // 1. Try the mounted credentials file — always has the latest OAuth token
+  const credsFile = process.env.CLAUDE_CREDENTIALS_FILE;
+  if (credsFile) {
+    try {
+      const data = JSON.parse(fs.readFileSync(credsFile, 'utf8'));
+      const oauthToken = (data.claudeAiOauth || {}).accessToken as string | undefined;
+      if (oauthToken) return { oauthToken };
+    } catch {
+      // file missing or malformed — fall through
+    }
+  }
+
+  // 2. Fall back to .env file / process.env
   const secrets = readEnvFile([
     'ANTHROPIC_API_KEY',
     'CLAUDE_CODE_OAUTH_TOKEN',
     'ANTHROPIC_AUTH_TOKEN',
-    'ANTHROPIC_BASE_URL',
   ]);
+  return {
+    apiKey: secrets.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+    oauthToken:
+      secrets.CLAUDE_CODE_OAUTH_TOKEN ||
+      secrets.ANTHROPIC_AUTH_TOKEN ||
+      process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+      process.env.ANTHROPIC_AUTH_TOKEN,
+  };
+}
 
-  // Fall back to process.env so credentials can be injected via Docker env vars
-  // without creating a .env file (which triggers an unresolvable shadow-mount conflict).
-  const apiKey =
-    secrets.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-  const authMode: AuthMode = apiKey ? 'api-key' : 'oauth';
-  const oauthToken =
-    secrets.CLAUDE_CODE_OAUTH_TOKEN ||
-    secrets.ANTHROPIC_AUTH_TOKEN ||
-    process.env.CLAUDE_CODE_OAUTH_TOKEN ||
-    process.env.ANTHROPIC_AUTH_TOKEN;
-
+export function startCredentialProxy(
+  port: number,
+  host = '127.0.0.1',
+): Promise<Server> {
+  // Upstream URL and auth mode are stable for the lifetime of the process.
+  const baseSecrets = readEnvFile(['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL']);
   const upstreamUrl = new URL(
-    secrets.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+    baseSecrets.ANTHROPIC_BASE_URL ||
+      process.env.ANTHROPIC_BASE_URL ||
+      'https://api.anthropic.com',
   );
   const isHttps = upstreamUrl.protocol === 'https:';
   const makeRequest = isHttps ? httpsRequest : httpRequest;
+
+  // Auth mode: determined once at startup (we're either API-key or OAuth).
+  const startupApiKey =
+    baseSecrets.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  const authMode: AuthMode = startupApiKey ? 'api-key' : 'oauth';
 
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
@@ -68,6 +97,10 @@ export function startCredentialProxy(
         delete headers['connection'];
         delete headers['keep-alive'];
         delete headers['transfer-encoding'];
+
+        // Re-read credentials on every request — picks up auto-refreshed OAuth
+        // tokens from the credentials file without requiring a restart.
+        const { apiKey, oauthToken } = readLiveCredentials();
 
         if (authMode === 'api-key') {
           // API key mode: inject x-api-key on every request
@@ -128,5 +161,7 @@ export function startCredentialProxy(
 /** Detect which auth mode the host is configured for. */
 export function detectAuthMode(): AuthMode {
   const secrets = readEnvFile(['ANTHROPIC_API_KEY']);
-  return secrets.ANTHROPIC_API_KEY ? 'api-key' : 'oauth';
+  return secrets.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY
+    ? 'api-key'
+    : 'oauth';
 }
