@@ -5,25 +5,77 @@ const UPTIME_KUMA_API_KEY = process.env.UPTIME_KUMA_API_KEY ?? ''
 const NTFY_BASE_URL = process.env.NTFY_BASE_URL ?? 'https://ntfy.jkrumm.com'
 const NTFY_TOKEN = process.env.NTFY_TOKEN ?? ''
 
-async function fetchUptimeKuma(path: string) {
-  const url = `${UPTIME_KUMA_URL}${path}?apikey=${UPTIME_KUMA_API_KEY}`
-  const res = await fetch(url)
+// UptimeKuma v2 exposes Prometheus metrics at /metrics with Basic auth.
+// Username is empty, password is the API key.
+async function fetchUptimeKumaMetrics(): Promise<string> {
+  const credentials = Buffer.from(`:${UPTIME_KUMA_API_KEY}`).toString('base64')
+  const base = UPTIME_KUMA_URL.replace(/\/$/, '')
+  const res = await fetch(`${base}/metrics`, {
+    headers: { Authorization: `Basic ${credentials}` },
+  })
   if (!res.ok) throw new Error(`UptimeKuma ${res.status}: ${await res.text()}`)
-  return res.json()
+  return res.text()
+}
+
+// Parse Prometheus text format into a list of monitor objects.
+// Collects monitor_status and monitor_uptime_ratio (1d window) per monitor.
+function parseMonitors(metrics: string): Array<{
+  id: string
+  name: string
+  type: string
+  url: string
+  status: number
+  uptime1d: number | null
+  uptime30d: number | null
+}> {
+  const statusMap = new Map<string, { id: string; name: string; type: string; url: string; status: number }>()
+  const uptimeMap = new Map<string, { d1: number | null; d30: number | null }>()
+
+  for (const line of metrics.split('\n')) {
+    if (line.startsWith('#') || !line.trim()) continue
+
+    // monitor_status{...} value
+    const statusMatch = line.match(
+      /^monitor_status\{monitor_id="([^"]+)",monitor_name="([^"]+)",monitor_type="([^"]+)",monitor_url="([^"]+)"[^}]*\}\s+([\d.]+)/,
+    )
+    if (statusMatch) {
+      const [, id, name, type, url, val] = statusMatch
+      statusMap.set(id, { id, name, type, url, status: Number(val) })
+      continue
+    }
+
+    // monitor_uptime_ratio{...,window="1d"} value
+    const uptimeMatch = line.match(
+      /^monitor_uptime_ratio\{monitor_id="([^"]+)"[^}]*,window="([^"]+)"\}\s+([\d.]+)/,
+    )
+    if (uptimeMatch) {
+      const [, id, window, val] = uptimeMatch
+      if (!uptimeMap.has(id)) uptimeMap.set(id, { d1: null, d30: null })
+      const entry = uptimeMap.get(id)!
+      if (window === '1d') entry.d1 = Number(val)
+      if (window === '30d') entry.d30 = Number(val)
+    }
+  }
+
+  return [...statusMap.values()].map((m) => ({
+    ...m,
+    uptime1d: uptimeMap.get(m.id)?.d1 ?? null,
+    uptime30d: uptimeMap.get(m.id)?.d30 ?? null,
+  }))
 }
 
 export const homelabRoutes = new Elysia({ prefix: '/homelab' })
   .get(
     '/uptime-kuma/monitors',
     async () => {
-      const data = await fetchUptimeKuma('/api/v1/monitor')
-      return data
+      const metrics = await fetchUptimeKumaMetrics()
+      return parseMonitors(metrics)
     },
     {
-      response: t.Any({ description: 'All monitors with status and uptime' }),
+      response: t.Any({ description: 'All monitors with status and uptime ratios' }),
       detail: {
         tags: ['Homelab'],
-        summary: 'Get all UptimeKuma monitors',
+        summary: 'Get all UptimeKuma monitors with status and uptime',
         security: [{ BearerAuth: [] }],
       },
     },
@@ -31,25 +83,25 @@ export const homelabRoutes = new Elysia({ prefix: '/homelab' })
   .get(
     '/uptime-kuma/status',
     async () => {
-      const data = (await fetchUptimeKuma('/api/v1/monitor')) as {
-        data?: { monitorList?: Record<string, { active: boolean; status?: number }> }
+      const metrics = await fetchUptimeKumaMetrics()
+      const monitors = parseMonitors(metrics)
+      // Exclude group-type monitors from counts (they aggregate children)
+      const real = monitors.filter((m) => m.type !== 'group')
+      return {
+        up: real.filter((m) => m.status === 1).length,
+        down: real.filter((m) => m.status === 0).length,
+        total: real.length,
       }
-      const monitors = Object.values(data?.data?.monitorList ?? {})
-      const up = monitors.filter((m) => m.active && m.status === 1).length
-      const down = monitors.filter((m) => m.active && m.status === 0).length
-      const paused = monitors.filter((m) => !m.active).length
-      return { up, down, paused, total: monitors.length }
     },
     {
       response: t.Object({
         up: t.Number(),
         down: t.Number(),
-        paused: t.Number(),
         total: t.Number(),
       }),
       detail: {
         tags: ['Homelab'],
-        summary: 'Get UptimeKuma monitor summary (up/down/paused counts)',
+        summary: 'Get UptimeKuma monitor summary (up/down counts, groups excluded)',
         security: [{ BearerAuth: [] }],
       },
     },
