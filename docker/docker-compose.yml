@@ -101,6 +101,11 @@ services:
     restart: unless-stopped
     networks:
       - agent-net
+    ports:
+      # Credential proxy — agent containers reach it via host.docker.internal:3001.
+      # Must be published so Docker's iptables NAT rules route traffic from the
+      # default bridge network (where agent containers run) to this container.
+      - "3001:3001"
     volumes:
       # Bind mount (not named volume) so nanoclaw can pass the host-side path to the
       # Docker daemon when spawning agent containers (Docker-in-Docker bind mount fix).
