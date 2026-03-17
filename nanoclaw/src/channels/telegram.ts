@@ -1,4 +1,5 @@
 import https from 'https';
+import { createRequire } from 'module';
 import { Api, Bot } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
@@ -12,6 +13,12 @@ import {
   RegisteredGroup,
 } from '../types.js';
 
+const require = createRequire(import.meta.url);
+const telegramifyMarkdown = require('telegramify-markdown') as (
+  markdown: string,
+  unsupportedTagsStrategy?: 'escape' | 'remove' | 'keep',
+) => string;
+
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -19,9 +26,9 @@ export interface TelegramChannelOpts {
 }
 
 /**
- * Send a message with Telegram Markdown parse mode, falling back to plain text.
- * Claude's output naturally matches Telegram's Markdown v1 format:
- *   *bold*, _italic_, `code`, ```code blocks```, [links](url)
+ * Send a message with Telegram MarkdownV2 parse mode, falling back to plain text.
+ * telegramify-markdown converts Claude's natural Markdown output to MarkdownV2
+ * with all special characters properly escaped.
  */
 async function sendTelegramMessage(
   api: { sendMessage: Api['sendMessage'] },
@@ -30,13 +37,14 @@ async function sendTelegramMessage(
   options: { message_thread_id?: number } = {},
 ): Promise<void> {
   try {
-    await api.sendMessage(chatId, text, {
+    const converted = telegramifyMarkdown(text, 'escape');
+    await api.sendMessage(chatId, converted, {
       ...options,
-      parse_mode: 'Markdown',
+      parse_mode: 'MarkdownV2',
     });
   } catch (err) {
-    // Fallback: send as plain text if Markdown parsing fails
-    logger.debug({ err }, 'Markdown send failed, falling back to plain text');
+    // Fallback: send as plain text if MarkdownV2 parsing fails
+    logger.debug({ err }, 'MarkdownV2 send failed, falling back to plain text');
     await api.sendMessage(chatId, text, options);
   }
 }
