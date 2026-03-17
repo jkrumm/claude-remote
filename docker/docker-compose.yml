@@ -64,7 +64,7 @@ services:
     volumes:
       - api-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -192,7 +192,6 @@ services:
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_POLL_INTERVAL: "86400"
       WATCHTOWER_NO_STARTUP_MESSAGE: "true"
-      WATCHTOWER_NOTIFICATIONS: "none"
     # Only watches infra containers — not custom builds
     command: >
       claude-remote-postgres
