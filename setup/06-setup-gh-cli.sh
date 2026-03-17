@@ -27,9 +27,8 @@ if sudo -u "$USERNAME" gh auth status &>/dev/null; then
   exit 0
 fi
 
-# Try to get token from Doppler
-GITHUB_TOKEN=""
-if command -v doppler &>/dev/null; then
+# Try env var first (allows injection from outside), then Doppler
+if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v doppler &>/dev/null; then
   GITHUB_TOKEN=$(doppler secrets get GITHUB_TOKEN --project claude-remote --config prod --plain 2>/dev/null || true)
 fi
 
