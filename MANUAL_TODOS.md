@@ -27,7 +27,7 @@ claude auth login
 2. For each repo in `config/repos.json`: GitHub → repo Settings → Deploy keys → Add deploy key
    - Title: `claude-remote@homelab`
    - Allow write access: yes (needed for pushing branches)
-**Status**: PENDING
+**Status**: DONE ✓
 
 ---
 
@@ -111,4 +111,4 @@ Host homelab-claude
 
 ## Completed
 
-_Nothing yet — RALPH loop has not run._
+- M-02: GitHub deploy key added to `basalt-ui` repo ✓

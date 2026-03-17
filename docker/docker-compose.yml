@@ -1,0 +1,108 @@
+networks:
+  agent-net:
+    driver: bridge
+  homelab:
+    external: true
+    name: ${HOMELAB_NETWORK_NAME:-homelab_cloudflared}
+
+services:
+
+  # --- Infrastructure (always latest, Watchtower-managed) ---
+
+  postgres:
+    image: postgres:latest
+    container_name: claude-remote-postgres
+    restart: unless-stopped
+    networks: [agent-net]
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: claude-remote
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: claude-remote
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claude-remote"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    image: valkey/valkey:latest
+    container_name: claude-remote-valkey
+    restart: unless-stopped
+    networks: [agent-net]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Bridge API ---
+  # Build context: sibling repo ../claude-remote-api (not yet created — see MANUAL_TODOS.md)
+  claude-remote-api:
+    build:
+      context: ${CLAUDE_REMOTE_API_PATH:-../claude-remote-api}
+      dockerfile: Dockerfile
+    container_name: claude-remote-api
+    restart: unless-stopped
+    networks:
+      - agent-net
+      - homelab
+    ports:
+      - "127.0.0.1:4000:4000"
+    environment:
+      - DOPPLER_TOKEN=${DOPPLER_TOKEN_API}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  # --- NanoClaw Telegram bot ---
+  nanoclaw:
+    build:
+      context: ./nanoclaw
+      dockerfile: Dockerfile
+    container_name: claude-remote-nanoclaw
+    restart: unless-stopped
+    networks:
+      - agent-net
+    volumes:
+      - nanoclaw-data:/data
+    environment:
+      - DOPPLER_TOKEN=${DOPPLER_TOKEN_NANOCLAW}
+    depends_on:
+      claude-remote-api:
+        condition: service_healthy
+
+  # --- Watchtower (updates infra containers only) ---
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: claude-remote-watchtower
+    restart: unless-stopped
+    networks: [agent-net]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "86400"
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
+      WATCHTOWER_NOTIFICATIONS: "none"
+    # Only watches the three infra containers — not custom builds
+    command: >
+      claude-remote-postgres
+      claude-remote-valkey
+      claude-remote-watchtower
+
+volumes:
+  pgdata:
+  nanoclaw-data:
