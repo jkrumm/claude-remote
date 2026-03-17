@@ -62,6 +62,9 @@ services:
       - NTFY_TOKEN=${NTFY_TOKEN}
       - NTFY_TOPIC=claude-remote
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
+      - UPTIME_KUMA_URL=${UPTIME_KUMA_URL}
+      - UPTIME_KUMA_API_KEY=${UPTIME_KUMA_API_KEY}
+      - CLAUDE_REMOTE_API_GITHUB_TOKEN=${CLAUDE_REMOTE_API_GITHUB_TOKEN}
     volumes:
       - api-data:/data
     healthcheck:
