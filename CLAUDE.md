@@ -48,3 +48,39 @@ See `~/.claude/skills/` for all skill files.
 - **Commits**: conventional format (`feat:`, `fix:`, `chore:`, etc.), no AI attribution
 - **Language**: English only in all code, comments, and documentation
 - **TypeScript**: strict mode, no `any`
+
+---
+
+## Doppler
+
+```bash
+# Run a command with secrets injected as env vars
+doppler run -- <command>
+
+# Get a specific secret value
+doppler secrets get KEY --plain
+
+# Example: start a dev server with secrets
+doppler run -- bun run dev
+```
+
+Secrets are scoped to the `claude-remote` project in Doppler.
+
+---
+
+## Shell aliases
+
+- `c` — `claude --dangerously-skip-permissions` — launches Claude Code without interactive permission prompts. Use this alias in tmux sessions and layout scripts.
+
+---
+
+## Database schemas
+
+Each project must use its own Postgres schema. **Never use the default `public` schema.**
+
+```
+?schema=<project-name>         # Prisma connection string
+search_path=<project-name>     # raw psql / Bun pg
+```
+
+Example: a project named `epos` connects with `postgres://...@localhost:5432/claude-remote?schema=epos`.
