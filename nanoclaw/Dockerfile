@@ -1,0 +1,36 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install Docker CLI — nanoclaw exec's `docker` commands to spawn agent containers.
+# DOCKER_HOST is set at runtime to point at docker-socket-proxy.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+       > /etc/apt/sources.list.d/docker.list \
+    && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY src/ ./src/
+COPY tsconfig.json ./
+RUN npx tsc && npm prune --omit=dev
+
+# State directories live in /data (named volume) and are symlinked from /app
+# so nanoclaw's relative paths (./store, ./groups, ./data) work transparently.
+RUN mkdir -p /data/store /data/groups /data/env \
+    && ln -s /data/store /app/store \
+    && ln -s /data/groups /app/groups \
+    && ln -s /data/env /app/data
+
+ENV NODE_ENV=production
+
+RUN useradd -r -u 1001 nanoclaw \
+    && chown -R nanoclaw /data /app
+USER nanoclaw
+
+CMD ["node", "dist/index.js"]

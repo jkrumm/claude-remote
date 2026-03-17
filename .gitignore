@@ -4,6 +4,10 @@ dist/
 bun.lock
 # Track api/ lockfile for reproducible Docker builds
 !api/bun.lock
+# nanoclaw local state (created at runtime by Docker)
+nanoclaw/store/
+nanoclaw/groups/
+nanoclaw/logs/
 
 # Secrets (never commit)
 .env

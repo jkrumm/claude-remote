@@ -92,15 +92,13 @@ services:
       - DELETE=1
 
   # --- NanoClaw Telegram bot ---
-  # NOTE: nanoclaw/main is a framework with no channel implementations bundled.
-  # src/channels/index.ts contains only commented-out imports — no Telegram channel exists
-  # in the public repo. Needs a fork with actual channel implementations before this works.
+  # Source lives in nanoclaw/ (root of claude-remote repo). Telegram channel applied via /add-telegram.
   nanoclaw:
     build:
-      context: ./nanoclaw
+      context: ../nanoclaw
       dockerfile: Dockerfile
     container_name: claude-remote-nanoclaw
-    restart: "no"
+    restart: unless-stopped
     networks:
       - agent-net
     volumes:
