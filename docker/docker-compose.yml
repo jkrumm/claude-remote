@@ -16,6 +16,7 @@ services:
     networks: [agent-net]
     ports:
       - "127.0.0.1:5432:5432"
+    command: ["postgres", "-c", "wal_level=logical"]
     environment:
       POSTGRES_USER: claude-remote
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -73,12 +74,14 @@ services:
         condition: service_healthy
 
   # --- NanoClaw Telegram bot ---
+  # Note: nanoclaw requires Docker socket access to spawn agent containers.
+  # Currently disabled (restart: no) until Docker socket access is resolved.
   nanoclaw:
     build:
       context: ./nanoclaw
       dockerfile: Dockerfile
     container_name: claude-remote-nanoclaw
-    restart: unless-stopped
+    restart: "no"
     networks:
       - agent-net
     volumes:
