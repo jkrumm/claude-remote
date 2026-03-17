@@ -103,12 +103,16 @@ services:
       - agent-net
     volumes:
       - nanoclaw-data:/data
+      # Mount claude-remote user credentials read-only so entrypoint can extract
+      # the current OAuth token on every restart (auto-refreshed by the running claude CLI).
+      - /home/claude-remote/.claude/.credentials.json:/run/secrets/claude-credentials:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
       - VIBEKANBAN_BASE_URL=http://vibekanban:3000
       - DOCKER_HOST=tcp://docker-proxy:2375
+      - CLAUDE_CREDENTIALS_FILE=/run/secrets/claude-credentials
     depends_on:
       claude-remote-api:
         condition: service_healthy

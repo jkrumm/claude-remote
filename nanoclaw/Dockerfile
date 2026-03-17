@@ -20,17 +20,21 @@ COPY src/ ./src/
 COPY tsconfig.json ./
 RUN npx tsc && npm prune --omit=dev
 
-# State directories live in /data (named volume) and are symlinked from /app
-# so nanoclaw's relative paths (./store, ./groups, ./data) work transparently.
-RUN mkdir -p /data/store /data/groups /data/env \
+# State directories live in /data (named volume), symlinked from /app so
+# nanoclaw's relative paths (./store, ./groups, ./data/env/env) resolve correctly.
+RUN mkdir -p /data/store /data/groups /data/env /data/logs \
     && ln -s /data/store /app/store \
     && ln -s /data/groups /app/groups \
-    && ln -s /data/env /app/data
+    && ln -s /data /app/data \
+    && ln -s /data/logs /app/logs
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production
 
 RUN useradd -r -u 1001 nanoclaw \
-    && chown -R nanoclaw /data /app
+    && chown -R nanoclaw /data /app /entrypoint.sh
 USER nanoclaw
 
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["/entrypoint.sh"]
