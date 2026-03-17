@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Generate SSH deploy key for the claude-remote user. Idempotent.
+# Generate SSH key for the claude-remote user. Idempotent.
+# Note: Git operations use HTTPS authenticated via gh CLI (see 06-setup-gh-cli.sh).
+# This key is for general-purpose SSH use (other servers, future needs).
 set -euo pipefail
 
 USERNAME="claude-remote"
@@ -12,31 +14,6 @@ else
   echo "Generated SSH key: $KEY_FILE"
 fi
 
-# SSH config for GitHub
-SSH_CONFIG="/home/$USERNAME/.ssh/config"
-if ! grep -q "github.com" "$SSH_CONFIG" 2>/dev/null; then
-  sudo -u "$USERNAME" tee -a "$SSH_CONFIG" > /dev/null <<'EOF'
-
-Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/id_ed25519
-    StrictHostKeyChecking accept-new
-EOF
-  sudo chmod 600 "$SSH_CONFIG"
-  sudo chown "$USERNAME:$USERNAME" "$SSH_CONFIG"
-  echo "GitHub SSH config written."
-else
-  echo "GitHub SSH config already present."
-fi
-
-echo ""
-echo "============================================================"
-echo "ACTION REQUIRED: Add this deploy key to your GitHub repos"
-echo "============================================================"
-sudo -u "$USERNAME" cat "${KEY_FILE}.pub"
-echo ""
-echo "GitHub → repo Settings → Deploy keys → Add deploy key"
-echo "Title: claude-remote@$(hostname)"
-echo "Allow write access: yes"
-echo "============================================================"
+sudo chmod 700 "/home/$USERNAME/.ssh"
+sudo chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
+echo "SSH key ready: $KEY_FILE"

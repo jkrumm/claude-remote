@@ -17,18 +17,18 @@ echo "Cloning $REPO_COUNT repo(s) from $REPOS_FILE..."
 
 for i in $(seq 0 $((REPO_COUNT - 1))); do
   NAME=$(jq -r ".repos[$i].name" "$REPOS_FILE")
-  SSH_URL=$(jq -r ".repos[$i].ssh_url" "$REPOS_FILE")
+  REPO_URL=$(jq -r ".repos[$i].url" "$REPOS_FILE")
   DEST="/home/$USERNAME/SourceRoot/$NAME"
 
   if [[ -d "$DEST/.git" ]]; then
     echo "  [ok] $NAME — already cloned, fetching..."
     sudo -u "$USERNAME" git -C "$DEST" fetch --quiet
   else
-    echo "  [clone] $NAME from $SSH_URL"
-    if sudo -u "$USERNAME" git clone "$SSH_URL" "$DEST" 2>&1; then
+    echo "  [clone] $NAME from $REPO_URL"
+    if sudo -u "$USERNAME" git clone "$REPO_URL" "$DEST" 2>&1; then
       echo "  [ok] $NAME cloned"
     else
-      echo "  [skip] $NAME — clone failed (deploy key not added yet? See MANUAL_TODOS.md M-02)"
+      echo "  [skip] $NAME — clone failed (gh CLI not authenticated yet? Run setup/06-setup-gh-cli.sh first)"
       continue
     fi
   fi
