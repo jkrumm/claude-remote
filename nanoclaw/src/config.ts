@@ -37,6 +37,33 @@ export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 
+// HOST_DATA_DIR: when nanoclaw runs inside Docker and spawns agent containers
+// via the host Docker daemon (Docker-in-Docker), bind mount paths must be real
+// host filesystem paths, not container-internal paths. Set this env var to the
+// host path that maps to the container's /data volume mount.
+const _HOST_DATA_DIR = process.env.HOST_DATA_DIR ?? null;
+
+/**
+ * Convert a nanoclaw-internal path to the corresponding host filesystem path
+ * for use in Docker bind mounts. Identity function in native (non-DinD) mode.
+ *
+ * In DinD mode the /data volume is mounted at both /data (container) and
+ * HOST_DATA_DIR (host). Symlinks /app/groups, /app/store, /app/data all point
+ * into /data, so we map them to HOST_DATA_DIR/groups, HOST_DATA_DIR/store, etc.
+ */
+export function toHostMountPath(p: string): string {
+  if (!_HOST_DATA_DIR) return p;
+  if (p === '/app/data' || p === '/data') return _HOST_DATA_DIR;
+  if (p.startsWith('/app/data/')) return path.join(_HOST_DATA_DIR, p.slice('/app/data/'.length));
+  if (p.startsWith('/data/')) return path.join(_HOST_DATA_DIR, p.slice('/data/'.length));
+  if (p.startsWith('/app/groups/')) return path.join(_HOST_DATA_DIR, 'groups', p.slice('/app/groups/'.length));
+  if (p.startsWith('/app/store/')) return path.join(_HOST_DATA_DIR, 'store', p.slice('/app/store/'.length));
+  return p;
+}
+
+/** True when running inside Docker with HOST_DATA_DIR configured. */
+export const IN_DOCKER_MODE = !!_HOST_DATA_DIR;
+
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
 export const CONTAINER_TIMEOUT = parseInt(

@@ -102,7 +102,9 @@ services:
     networks:
       - agent-net
     volumes:
-      - nanoclaw-data:/data
+      # Bind mount (not named volume) so nanoclaw can pass the host-side path to the
+      # Docker daemon when spawning agent containers (Docker-in-Docker bind mount fix).
+      - /home/claude-remote/nanoclaw-data:/data
       # Mount claude-remote user credentials read-only so entrypoint can extract
       # the current OAuth token on every restart (auto-refreshed by the running claude CLI).
       - /home/claude-remote/.claude/.credentials.json:/run/secrets/claude-credentials:ro
@@ -113,6 +115,8 @@ services:
       - VIBEKANBAN_BASE_URL=http://vibekanban:3000
       - DOCKER_HOST=tcp://docker-proxy:2375
       - CLAUDE_CREDENTIALS_FILE=/run/secrets/claude-credentials
+      # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
+      - HOST_DATA_DIR=/home/claude-remote/nanoclaw-data
     depends_on:
       claude-remote-api:
         condition: service_healthy
@@ -214,5 +218,4 @@ services:
 volumes:
   pgdata:
   api-data:
-  nanoclaw-data:
   azurite-data:
