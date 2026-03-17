@@ -86,12 +86,17 @@ else
   echo "  [skip] tmux/launch.sh not yet created"
 fi
 
-# Clone the claude-remote repo into the claude-remote user's SourceRoot if not there yet
-if [[ ! -d "/home/$USERNAME/SourceRoot/claude-remote/.git" ]]; then
+# Clone or pull the claude-remote repo into the claude-remote user's SourceRoot
+CLAUDE_REMOTE_REPO="/home/$USERNAME/SourceRoot/claude-remote"
+if [[ ! -d "$CLAUDE_REMOTE_REPO/.git" ]]; then
   echo "  [clone] claude-remote repo for claude-remote user"
   sudo -u "$USERNAME" git clone https://github.com/jkrumm/claude-remote.git \
-    "/home/$USERNAME/SourceRoot/claude-remote" 2>/dev/null || \
+    "$CLAUDE_REMOTE_REPO" 2>/dev/null || \
     echo "  [skip] repo clone failed — may need deploy key or manual setup"
+else
+  echo "  [pull] updating claude-remote repo for claude-remote user"
+  sudo -u "$USERNAME" git -C "$CLAUDE_REMOTE_REPO" pull --ff-only 2>/dev/null || \
+    echo "  [warn] git pull failed — repo may have local changes or no network"
 fi
 
 echo "Shell environment setup complete."

@@ -6,6 +6,14 @@ USERNAME="claude-remote"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Ensure claude-remote user's repo copy is up to date
+CLAUDE_REMOTE_REPO="/home/$USERNAME/SourceRoot/claude-remote"
+if [[ -d "$CLAUDE_REMOTE_REPO/.git" ]]; then
+  echo "Updating claude-remote repo for $USERNAME user..."
+  sudo -u "$USERNAME" git -C "$CLAUDE_REMOTE_REPO" pull --ff-only 2>/dev/null || \
+    echo "  [warn] git pull failed — using existing repo state"
+fi
+
 # Install Claude Code CLI
 if sudo -u "$USERNAME" bash -c 'command -v claude &>/dev/null'; then
   echo "Claude Code already installed: $(sudo -u "$USERNAME" bash -c 'claude --version 2>/dev/null || echo unknown')"
