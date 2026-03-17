@@ -57,9 +57,10 @@ services:
     environment:
       - TICKTICK_CLIENT_ID=${TICKTICK_CLIENT_ID}
       - TICKTICK_CLIENT_SECRET=${TICKTICK_CLIENT_SECRET}
-      - TICKTICK_ACCESS_TOKEN=${TICKTICK_ACCESS_TOKEN}
       - NTFY_BASE_URL=${NTFY_BASE_URL}
-      - NTFY_TOPIC=${NTFY_TOPIC}
+      - NTFY_TOKEN=${NTFY_TOKEN}
+      - NTFY_TOPIC=claude-remote
+      - HOMELAB_API_SECRET=${HOMELAB_API_SECRET}
       - POSTGRES_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/claude-remote
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
