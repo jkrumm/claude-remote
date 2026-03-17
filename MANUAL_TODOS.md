@@ -72,9 +72,9 @@ doppler service-tokens create --project claude-remote --config nanoclaw nanoclaw
 ```
 4. Store the tokens in the `docker` config:
 ```bash
-doppler secrets set DOPPLER_TOKEN_API=<api-token> --project claude-remote --config docker
-doppler secrets set DOPPLER_TOKEN_NANOCLAW=<nanoclaw-token> --project claude-remote --config docker
-doppler secrets set POSTGRES_PASSWORD=<strong-password> --project claude-remote --config docker
+doppler secrets set DOPPLER_TOKEN_API=<api-token> --project claude-remote --config prod_docker
+doppler secrets set DOPPLER_TOKEN_NANOCLAW=<nanoclaw-token> --project claude-remote --config prod_docker
+doppler secrets set POSTGRES_PASSWORD=<strong-password> --project claude-remote --config prod_docker
 ```
 **Status**: PENDING
 

@@ -22,16 +22,16 @@ if ! command -v doppler &>/dev/null; then
 fi
 
 # Check if Doppler docker config has POSTGRES_PASSWORD
-if ! doppler secrets get POSTGRES_PASSWORD --project claude-remote --config docker --plain &>/dev/null 2>&1; then
+if ! doppler secrets get POSTGRES_PASSWORD --project claude-remote --config prod_docker --plain &>/dev/null 2>&1; then
   echo ""
-  echo "  [skip] POSTGRES_PASSWORD not set in Doppler (project: claude-remote, config: docker)"
+  echo "  [skip] POSTGRES_PASSWORD not set in Doppler (project: claude-remote, config: prod_docker)"
   echo "  Complete M-05 in MANUAL_TODOS.md to populate Docker secrets, then re-run this script."
   echo ""
   exit 0
 fi
 
 echo "Starting postgres and valkey..."
-doppler run --project claude-remote --config docker -- \
+doppler run --project claude-remote --config prod_docker -- \
   docker compose -f "$REPO_ROOT/docker/docker-compose.yml" up -d postgres valkey
 
 echo "Waiting for postgres and valkey to be healthy (up to 60s)..."

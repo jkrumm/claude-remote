@@ -6,5 +6,5 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-doppler run --project claude-remote --config docker -- \
+doppler run --project claude-remote --config prod_docker -- \
   docker compose -f "$REPO_ROOT/docker/docker-compose.yml" up -d "$@"
