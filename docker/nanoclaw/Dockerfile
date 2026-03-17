@@ -2,8 +2,8 @@ FROM node:20-slim AS builder
 
 WORKDIR /build
 
-# Install git for cloning
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# Install git and ca-certificates for cloning over HTTPS
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 ARG NANOCLAW_VERSION=main
