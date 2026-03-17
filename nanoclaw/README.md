@@ -218,6 +218,18 @@ Everything else (new capabilities, OS compatibility, hardware support, enhanceme
 
 This keeps the base system minimal and lets every user customize their installation without inheriting features they don't want.
 
+## Planned Integrations
+
+Integrations queued for future work in this fork:
+
+| Integration | Status | Notes |
+|-|-|-|
+| Beszel | Deferred | PocketBase auth complexity |
+| Dozzle | Deferred | SSE log streaming awkward to proxy |
+| Umami (VPS) | Deferred | Analytics queries; needs API token investigation |
+| Tavily / Perplexity | Deferred | Web search; assess proxy vs credential injection |
+| VibeKanban | Uncertain | GitHub OAuth + JWT auth — no simple API key; investigate MCP approach (`npx vibe-kanban@latest --mcp`) |
+
 ## Community
 
 Questions? Ideas? [Join the Discord](https://discord.gg/VDdww8qS42).

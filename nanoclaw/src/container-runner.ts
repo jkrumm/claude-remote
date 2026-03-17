@@ -238,6 +238,14 @@ function buildContainerArgs(
     args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
   }
 
+  // Expose the claude-remote-api to agent containers so skills can call it
+  const apiUrl =
+    process.env.CLAUDE_REMOTE_API_URL ??
+    `http://${CONTAINER_HOST_GATEWAY}:4000`;
+  const apiSecret = process.env.CLAUDE_REMOTE_API_SECRET ?? '';
+  args.push('-e', `CLAUDE_REMOTE_API_URL=${apiUrl}`);
+  args.push('-e', `CLAUDE_REMOTE_API_SECRET=${apiSecret}`);
+
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());
 
