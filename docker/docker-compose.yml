@@ -104,7 +104,9 @@ services:
       dockerfile: crates/remote/Dockerfile
     container_name: claude-remote-vibekanban
     restart: unless-stopped
-    networks: [agent-net]
+    networks:
+      - agent-net
+      - homelab
     ports:
       - "127.0.0.1:3000:8081"
     environment:
@@ -114,7 +116,7 @@ services:
       - VIBEKANBAN_REMOTE_JWT_SECRET=${VIBEKANBAN_JWT_SECRET}
       - GITHUB_OAUTH_CLIENT_ID=${VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID:-}
       - GITHUB_OAUTH_CLIENT_SECRET=${VIBEKANBAN_GITHUB_OAUTH_CLIENT_SECRET:-}
-      - SERVER_PUBLIC_BASE_URL=${VIBEKANBAN_PUBLIC_URL:-http://localhost:3000}
+      - SERVER_PUBLIC_BASE_URL=${VIBEKANBAN_PUBLIC_URL:-https://claude-remote.jkrumm.com}
       - AZURE_STORAGE_ACCOUNT_NAME=devstoreaccount1
       - AZURE_STORAGE_ACCOUNT_KEY=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
       - AZURE_STORAGE_CONTAINER_NAME=issue-attachments
