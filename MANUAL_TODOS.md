@@ -103,7 +103,7 @@ doppler secrets set \
 ```bash
 ssh homelab
 cd ~/SourceRoot/claude-remote
-sudo bash setup/09b-vibekanban.sh
+bash setup/09b-vibekanban.sh
 ```
 
 First build takes ~10 minutes (Rust + Node.js). Access via SSH tunnel:

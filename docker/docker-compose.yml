@@ -97,7 +97,7 @@ services:
   # Requires GitHub OAuth app (VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID/SECRET)
   vibekanban:
     build:
-      context: ${VIBEKANBAN_REPO_PATH:-../vibe-kanban}
+      context: ${VIBEKANBAN_REPO_PATH:-../../vibe-kanban}
       dockerfile: crates/remote/Dockerfile
     container_name: claude-remote-vibekanban
     restart: unless-stopped
