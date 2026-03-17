@@ -36,10 +36,10 @@ PAT permissions required:
 
 ---
 
-### M-03: Populate Doppler prod_docker config
+### M-03: Populate Doppler prod config
 **Why it's manual**: Requires knowing your actual secret values
 **Command/Action**:
-Populate the `prod_docker` config with all secrets needed by the compose stack.
+Populate the `prod` config with all secrets needed by the compose stack.
 Run from your Mac (Doppler CLI authenticated):
 ```bash
 doppler secrets set \
@@ -49,7 +49,7 @@ doppler secrets set \
   TICKTICK_CLIENT_ID=<see-ticktick-developer-settings> \
   TICKTICK_CLIENT_SECRET=<see-ticktick-developer-settings> \
   TICKTICK_ACCESS_TOKEN=<oauth-token> \
-  --project claude-remote --config prod_docker
+  --project claude-remote --config prod
 ```
 `TELEGRAM_BOT_TOKEN` is added separately in M-04. `HOMELAB_NETWORK_NAME` defaults to `homelab_cloudflared` in compose — only set if yours differs.
 **Status**: PENDING
@@ -62,7 +62,7 @@ doppler secrets set \
 1. Message @BotFather on Telegram: `/newbot`
 2. Name: `ClaudeRemote`, username: `<something>_bot`
 3. Copy the token
-4. Store: `doppler secrets set TELEGRAM_BOT_TOKEN=<token> --project claude-remote --config prd_nanoclaw`
+4. Store: `doppler secrets set TELEGRAM_BOT_TOKEN=<token> --project claude-remote --config prod`
 **Status**: PENDING
 
 ---

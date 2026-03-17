@@ -193,10 +193,7 @@ All secrets are managed via [Doppler](https://doppler.com) — no `.env` files a
 
 | Config | Used by |
 |-|-|
-| `dev` / `prod` | claude-remote user shell (GITHUB_TOKEN, general env) |
-| `prod_docker` | docker-compose launch (POSTGRES_PASSWORD, Doppler service tokens) |
-| `api` | claude-remote-api container (TickTick, NTFY, Postgres URL) |
-| `nanoclaw` | NanoClaw container (Telegram bot token, API URL) |
+| `prod` | Everything — shell, setup scripts, and docker-compose stack |
 
 See [docs/doppler.md](docs/doppler.md) for the full secrets reference.
 

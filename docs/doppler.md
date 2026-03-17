@@ -11,9 +11,9 @@ All secrets are managed in Doppler — no `.env` files anywhere in this project.
 | Config | Used by | Contains |
 |-|-|-|
 | `prod` | claude-remote user shell, setup scripts | `GITHUB_TOKEN`, general env vars |
-| `prod_docker` | `dc-up.sh` / `docker compose up` | All secrets for the entire compose stack (see below) |
+| `prod` | `dc-up.sh` / `docker compose up` | All secrets for the entire compose stack (see below) |
 
-**`prod_docker` secrets:**
+**`prod` secrets:**
 
 | Secret | Used by |
 |-|-|
@@ -44,13 +44,13 @@ doppler run -- bun test
 
 ```bash
 # Starts postgres, valkey, api, nanoclaw, watchtower
-doppler run --project claude-remote --config prod_docker -- docker compose -f docker/docker-compose.yml up -d
+doppler run --project claude-remote --config prod -- docker compose -f docker/docker-compose.yml up -d
 
 # Or use the wrapper script (does the same thing)
 ./scripts/dc-up.sh
 ```
 
-The compose file reads `DOPPLER_TOKEN_API` and `DOPPLER_TOKEN_NANOCLAW` from the `prod_docker` config and passes them to the respective containers. Each container then uses its own Doppler service token to fetch its own secrets at startup.
+The compose file reads `DOPPLER_TOKEN_API` and `DOPPLER_TOKEN_NANOCLAW` from the `prod` config and passes them to the respective containers. Each container then uses its own Doppler service token to fetch its own secrets at startup.
 
 ### Claude Code — read a secret in a session
 
@@ -95,7 +95,7 @@ doppler configs --project claude-remote
 
 ## Notes
 
-- `prod_docker` is the naming convention Doppler requires when an environment is `prd` and the config branch is `docker`. Doppler prefixes branch configs with the environment slug.
+- `prod` is the naming convention Doppler requires when an environment is `prd` and the config branch is `docker`. Doppler prefixes branch configs with the environment slug.
 - The `claude-remote` user on the homelab needs to authenticate Doppler separately: `sudo -u claude-remote -i doppler login`.
 - The `dev` config is for interactive use by the claude-remote user. It does not contain Docker-specific secrets.
 - Never commit secrets, `.env` files, or service tokens to git. All values live exclusively in Doppler.
