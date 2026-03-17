@@ -73,15 +73,30 @@ services:
       postgres:
         condition: service_healthy
 
+  # --- Docker socket proxy (for NanoClaw) ---
+  # Limits Docker API surface exposed to nanoclaw: only container lifecycle ops allowed.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: claude-remote-docker-proxy
+    restart: unless-stopped
+    networks:
+      - agent-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - NETWORKS=1
+      - POST=1
+      - DELETE=1
+
   # --- NanoClaw Telegram bot ---
-  # Note: nanoclaw requires Docker socket access to spawn agent containers.
-  # Currently disabled (restart: no) until Docker socket access is resolved.
   nanoclaw:
     build:
       context: ./nanoclaw
       dockerfile: Dockerfile
     container_name: claude-remote-nanoclaw
-    restart: "no"
+    restart: unless-stopped
     networks:
       - agent-net
     volumes:
@@ -91,9 +106,12 @@ services:
       - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
       - VIBEKANBAN_BASE_URL=http://vibekanban:3000
+      - DOCKER_HOST=tcp://docker-proxy:2375
     depends_on:
       claude-remote-api:
         condition: service_healthy
+      docker-proxy:
+        condition: service_started
 
   # --- Vibekanban AI agent orchestration ---
   # Build from source: clone vibe-kanban to ~/SourceRoot/vibe-kanban (see MANUAL_TODOS.md M-06)
