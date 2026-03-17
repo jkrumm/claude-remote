@@ -20,6 +20,10 @@ COPY src/ ./src/
 COPY tsconfig.json ./
 RUN npx tsc && npm prune --omit=dev
 
+# Agent-runner source — container-runner.ts copies this into per-group data dirs
+# so each group's agent container gets a writable copy it can customize.
+COPY container/ ./container/
+
 # State directories live in /data (named volume), symlinked from /app so
 # nanoclaw's relative paths (./store, ./groups, ./data/env/env) resolve correctly.
 RUN mkdir -p /data/store /data/groups /data/env /data/logs \
