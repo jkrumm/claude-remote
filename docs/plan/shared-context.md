@@ -92,7 +92,7 @@ claude-remote/
 
 | Fact | Value |
 |-|-|
-| SSH | `ssh homelab` → jkrumm@100.85.139.104 (Tailscale) |
+| SSH | `ssh homelab` → jkrumm@<tailscale-ip> (Tailscale) |
 | OS | Ubuntu 24.04.4 LTS |
 | Sudo password | `doppler secrets get JKRUMM_PASSWORD -p homelab -c prod --plain` |
 | NTFY Docker network | `homelab_cloudflared` (not a generic "homelab" network) |

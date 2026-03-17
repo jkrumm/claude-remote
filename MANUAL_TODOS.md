@@ -101,7 +101,7 @@ ssh homelab "echo '$(cat ~/.ssh/claude-remote-homelab.pub)' | sudo -u claude-rem
 Then add to `~/.ssh/config`:
 ```
 Host homelab-claude
-    HostName 100.85.139.104
+    HostName <tailscale-ip>
     User claude-remote
     IdentityFile ~/.ssh/claude-remote-homelab
 ```

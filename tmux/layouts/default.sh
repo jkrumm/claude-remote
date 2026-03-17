@@ -2,6 +2,7 @@
 # tmux/layouts/default.sh
 # Layout: 75% left (Claude Code), 25% right split top/bottom (terminal + dev server)
 # Called by launch.sh with $SESSION and $REPO_DIR set.
+set -euo pipefail
 
 tmux new-session -d -s "$SESSION" -c "$REPO_DIR"
 
