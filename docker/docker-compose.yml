@@ -84,6 +84,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
+      - INFO=1
       - CONTAINERS=1
       - IMAGES=1
       - NETWORKS=1
