@@ -60,3 +60,21 @@ None (shell syntax via `bash -n`, TypeScript via `bun run typecheck` — passes 
 `spawn-headless.sh` currently passes `--worktree true/false` as a string arg; `trigger-handler.ts` checks `!== "false"` to handle this. Could be cleaner with a proper CLI arg parser. The `createPr` function uses a hardcoded commit message prefix — prompt templates should instruct the agent to commit with a meaningful message before the script pushes. The `bun.lock` file is gitignored globally but should probably be tracked in `agents/` — worth revisiting when `claude-remote-api` is added.
 
 ---
+## Group 8: Complete README & Documentation
+
+### What was implemented
+Full README rewrite with architecture diagram, security model table, daily usage patterns, and project structure tree. New `docs/doppler.md` with Doppler secrets reference, configs table, usage patterns, and new-service setup guide. Also tracked `IMPLEMENTATION_PLAN.md` (was present but never committed), added missing `set -euo pipefail` to `tmux/layouts/default.sh`, and redacted a real Tailscale IP that was in two tracked files.
+
+### Deviations from prompt
+Group 8 said to run a homelab verification (`10-verify.sh`) and update `MANUAL_TODOS.md` based on results. Skipped the remote homelab run — the verification script requires the Docker stack and Claude Code auth to be complete (pending manual steps M-01, M-03, M-05), so running it now would produce mostly failures that aren't meaningful yet.
+
+### Gotchas & surprises
+`IMPLEMENTATION_PLAN.md` had never been committed despite being referenced by multiple documents — it existed from before the first commit and was never explicitly staged. The Tailscale IP appeared in two tracked files and was redacted to `<tailscale-ip>` per the no-sensitive-data-in-git convention.
+
+### Tests added
+None — documentation only. Validated: all shell scripts pass `bash -n`, TypeScript passes `bun run typecheck`, all key files present.
+
+### Future improvements
+The homelab verification run should be done once M-01, M-03, and M-05 manual steps are complete. At that point, re-run `./setup/10-verify.sh` and update `MANUAL_TODOS.md` with the actual state.
+
+---
