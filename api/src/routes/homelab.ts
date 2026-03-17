@@ -107,6 +107,27 @@ export const homelabRoutes = new Elysia({ prefix: '/homelab' })
     },
   )
   .get(
+    '/ntfy/topics',
+    async () => {
+      const res = await fetch(`${NTFY_BASE_URL}/v1/account`, {
+        headers: NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {},
+      })
+      if (!res.ok) throw new Error(`ntfy ${res.status}: ${await res.text()}`)
+      const account = (await res.json()) as {
+        subscriptions?: Array<{ topic: string; display_name?: string | null }>
+      }
+      return (account.subscriptions ?? []).map((s) => s.topic)
+    },
+    {
+      response: t.Any({ description: 'Array of subscribed ntfy topic names' }),
+      detail: {
+        tags: ['Homelab'],
+        summary: 'List all subscribed ntfy topics for this account',
+        security: [{ BearerAuth: [] }],
+      },
+    },
+  )
+  .get(
     '/ntfy/messages',
     async ({ query }) => {
       const topic = query.topic

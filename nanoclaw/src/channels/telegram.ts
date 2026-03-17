@@ -19,6 +19,55 @@ const telegramifyMarkdown = require('telegramify-markdown') as (
   unsupportedTagsStrategy?: 'escape' | 'remove' | 'keep',
 ) => string;
 
+// Telegram doesn't render Markdown tables — convert them to fixed-width
+// monospace code blocks so they stay aligned.
+function preprocessTables(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let tableLines: string[] = [];
+
+  const isTableLine = (line: string) => /^\s*\|/.test(line);
+  const isSeparatorLine = (line: string) =>
+    /^\s*\|[\s|:\-]+\|\s*$/.test(line);
+
+  const flushTable = () => {
+    if (tableLines.length === 0) return;
+    const dataLines = tableLines.filter((l) => !isSeparatorLine(l));
+    const rows = dataLines.map((l) =>
+      l
+        .replace(/^\s*\|/, '')
+        .replace(/\|\s*$/, '')
+        .split('|')
+        .map((c) => c.trim()),
+    );
+    if (rows.length === 0) {
+      out.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const widths = Array.from({ length: colCount }, (_, i) =>
+      Math.max(...rows.map((r) => (r[i] ?? '').length), 1),
+    );
+    const formatted = rows.map((row) =>
+      row.map((cell, i) => cell.padEnd(widths[i])).join('  '),
+    );
+    out.push('```', ...formatted, '```');
+    tableLines = [];
+  };
+
+  for (const line of lines) {
+    if (isTableLine(line)) {
+      tableLines.push(line);
+    } else {
+      flushTable();
+      out.push(line);
+    }
+  }
+  flushTable();
+  return out.join('\n');
+}
+
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -37,7 +86,7 @@ async function sendTelegramMessage(
   options: { message_thread_id?: number } = {},
 ): Promise<void> {
   try {
-    const converted = telegramifyMarkdown(text, 'escape');
+    const converted = telegramifyMarkdown(preprocessTables(text), 'escape');
     await api.sendMessage(chatId, converted, {
       ...options,
       parse_mode: 'MarkdownV2',

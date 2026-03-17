@@ -24,17 +24,23 @@ curl -s -H "Authorization: Bearer $CLAUDE_REMOTE_API_SECRET" \
 # → UptimeKuma monitorList with heartbeat data
 ```
 
-## ntfy — query topic messages
+## ntfy — topic discovery and message querying
 
-Useful to check recent homelab-watchdog alerts or other automated notifications.
+**Always discover topics first**, then fetch messages for each one:
 
 ```bash
+# Step 1: list all subscribed topics
 curl -s -H "Authorization: Bearer $CLAUDE_REMOTE_API_SECRET" \
-  "$CLAUDE_REMOTE_API_URL/homelab/ntfy/messages?topic=homelab-watchdog"
+  "$CLAUDE_REMOTE_API_URL/homelab/ntfy/topics"
+# → ["homelab-watchdog", "homelab-watchtower", "vps-watchtower", "uptime-alerts", "claude-remote", ...]
+
+# Step 2: fetch messages for each topic
+curl -s -H "Authorization: Bearer $CLAUDE_REMOTE_API_SECRET" \
+  "$CLAUDE_REMOTE_API_URL/homelab/ntfy/messages?topic=<topic>"
 # → JSON array of recent messages on that topic
 ```
 
-Common topics: `homelab-watchdog`, `claude-remote`
+Never assume which topics exist — always call `/homelab/ntfy/topics` first.
 
 ## Response interpretation
 
