@@ -95,6 +95,11 @@ run_as_user 'claude --version' &>/dev/null \
   || check "claude installed" "fail"
 run_as_user 'claude auth status 2>&1' | grep -qi "logged in\|authenticated\|oauth" \
   && check "claude oauth" "ok" || check "claude oauth" "fail" "auth required (M-01)"
+[[ -L /home/claude-remote/.claude/skills ]] \
+  && check "claude skills symlink" "ok" "$(readlink /home/claude-remote/.claude/skills)" \
+  || check "claude skills symlink" "fail" "run setup/09c-setup-claude-config.sh"
+[[ -L /home/claude-remote/.claude/CLAUDE.md ]] \
+  && check "claude CLAUDE.md symlink" "ok" || check "claude CLAUDE.md symlink" "fail" "run setup/09c-setup-claude-config.sh"
 
 echo ""
 echo "=== Network isolation ==="
