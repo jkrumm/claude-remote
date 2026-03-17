@@ -55,10 +55,17 @@ run_as_user '~/.nvm/nvm.sh && node --version' &>/dev/null \
 echo ""
 echo "=== Docker stack ==="
 if command -v docker &>/dev/null; then
-  for name in claude-remote-postgres claude-remote-valkey; do
+  for name in claude-remote-postgres claude-remote-valkey claude-remote-api; do
     docker inspect "$name" --format '{{.State.Status}}' 2>/dev/null | grep -q "running" \
       && check "$name" "ok" "running" || check "$name" "fail" "not running"
   done
+  # Vibekanban is optional (requires M-06 to be completed)
+  if docker inspect claude-remote-vibekanban &>/dev/null 2>&1; then
+    docker inspect claude-remote-vibekanban --format '{{.State.Status}}' 2>/dev/null | grep -q "running" \
+      && check "claude-remote-vibekanban" "ok" "running" || check "claude-remote-vibekanban" "fail" "not running"
+  else
+    check "claude-remote-vibekanban" "ok" "(not started — complete MANUAL_TODOS.md M-06 first)"
+  fi
 else
   check "docker" "fail" "docker not available"
 fi
@@ -67,6 +74,11 @@ echo ""
 echo "=== Connectivity ==="
 curl -sf http://localhost:4000/health &>/dev/null \
   && check "claude-remote-api" "ok" || check "claude-remote-api" "fail" "not reachable (start Docker stack)"
+if docker inspect claude-remote-vibekanban &>/dev/null 2>&1 && \
+   docker inspect claude-remote-vibekanban --format '{{.State.Status}}' 2>/dev/null | grep -q "running"; then
+  curl -sf http://localhost:3000/v1/health &>/dev/null \
+    && check "vibekanban" "ok" || check "vibekanban" "fail" "not reachable"
+fi
 
 echo ""
 echo "=== Git ==="

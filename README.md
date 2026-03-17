@@ -1,12 +1,12 @@
 # claude-remote
 
-An isolated, agnostic remote coding agent environment for any headless Ubuntu server. Provides Claude Code interactive sessions via tmux, headless Agent SDK agents triggered via API, a NanoClaw Telegram bot for chat-based control, and a bridge API for notifications and task management — all sandboxed from the rest of the host.
+An isolated, agnostic remote coding agent environment for any headless Ubuntu server. Provides Claude Code interactive sessions via tmux, Vibekanban for AI agent orchestration and kanban-style task tracking, a NanoClaw Telegram bot for chat-based control, and a bridge API for notifications and task management — all sandboxed from the rest of the host.
 
 ---
 
 ## What This Is
 
-**claude-remote** turns a headless Ubuntu server into a full coding agent environment. You SSH in and run Claude Code interactively in a tmux session, or trigger headless agents via HTTP to work on repos autonomously. NanoClaw lets you dispatch tasks from Telegram when you're away from a keyboard. Everything runs as an isolated `claude-remote` user with no sudo, no Docker socket, and no access to other host services.
+**claude-remote** turns a headless Ubuntu server into a full coding agent environment. You SSH in and run Claude Code interactively in a tmux session, or use Vibekanban to orchestrate headless Claude agents across repos with a kanban UI, worktrees, and automatic PR creation. NanoClaw lets you dispatch tasks from Telegram when you're away from a keyboard. Everything runs as an isolated `claude-remote` user with no sudo, no Docker socket, and no access to other host services.
 
 The setup is fully agnostic — fork the repo, edit `config/repos.json`, and run `./setup.sh` to replicate it on your own machine.
 
@@ -60,6 +60,7 @@ These require browser access or external services and cannot be automated:
 | **gh CLI auth** | Run `sudo bash setup/06-setup-gh-cli.sh` — guided PAT setup (see MANUAL_TODOS.md M-02) |
 | **Add repos** | Edit `config/repos.json`, then re-run `./setup/07-clone-repos.sh` |
 | **NanoClaw Telegram bot** | Create via @BotFather, store token in Doppler (see MANUAL_TODOS.md M-04) |
+| **Vibekanban** | Clone repo, create GitHub OAuth app, add Doppler secrets (see MANUAL_TODOS.md M-06) |
 
 See [MANUAL_TODOS.md](MANUAL_TODOS.md) for the full checklist with exact commands.
 
@@ -69,7 +70,7 @@ See [MANUAL_TODOS.md](MANUAL_TODOS.md) for the full checklist with exact command
 ./scripts/dc-up.sh
 ```
 
-This starts: Postgres, Valkey, claude-remote-api, NanoClaw, and Watchtower.
+This starts: Postgres, Valkey, claude-remote-api, NanoClaw, Vibekanban, ElectricSQL, Azurite, and Watchtower.
 
 ### 5. Verify
 
@@ -111,6 +112,9 @@ launch <repo-name>
 │  │                                              │   │
 │  │  Docker (agent-net):                         │   │
 │  │  ├── claude-remote-api  :4000                │   │
+│  │  ├── vibekanban          :3000               │   │
+│  │  ├── electric (sync)                         │   │
+│  │  ├── azurite (blob store)                    │   │
 │  │  ├── nanoclaw (Telegram bot)                 │   │
 │  │  ├── postgres           :5432 (localhost)    │   │
 │  │  └── valkey             :6379 (localhost)    │   │
@@ -121,7 +125,7 @@ launch <repo-name>
 └──────────────────────────────────────────────────────┘
 ```
 
-Ports 4000, 5432, and 6379 are bound to `127.0.0.1` only — not exposed to the network. The `claude-remote-api` container is dual-homed (agent-net + homelab network) so it can reach NTFY on the host network; NanoClaw is on agent-net only.
+Ports 4000, 5432, and 6379 are bound to `127.0.0.1` only. Port 3000 (vibekanban) is also localhost-only — access via SSH tunnel: `ssh -L 3000:localhost:3000 homelab`. The `claude-remote-api` container is dual-homed (agent-net + homelab network) so it can reach NTFY on the host network; all other containers are on agent-net only.
 
 ---
 
@@ -138,15 +142,15 @@ Inside tmux (prefix: `Ctrl+A`):
 - `hjkl` — navigate panes
 - `y` — open a per-directory Claude popup (persistent session)
 
-### Trigger a headless agent
+### Vibekanban (agent orchestration)
 
+Access the kanban UI via SSH tunnel:
 ```bash
-curl -X POST http://localhost:4000/api/agents/trigger \
-  -H "Content-Type: application/json" \
-  -d '{"repo": "my-repo", "prompt": "Fix the failing tests in the auth module", "worktree": true}'
+ssh -L 3000:localhost:3000 homelab
+# then open http://localhost:3000 in your browser
 ```
 
-The agent runs in a git worktree, pushes a branch, creates a PR, and sends an NTFY notification when done.
+Create tasks in the UI and Vibekanban launches Claude Code in a git worktree. When done, it pushes a branch and creates a PR. You can also connect Claude Code in your tmux session to Vibekanban via MCP (see MANUAL_TODOS.md M-06).
 
 ### NanoClaw (Telegram)
 
@@ -159,8 +163,9 @@ Message `@<your-bot>` on Telegram to:
 
 ```bash
 ./scripts/notify.sh "Deployment complete" "my-repo" 3
-# or via curl:
+# or via curl (bearer token required):
 curl -X POST http://localhost:4000/api/notify \
+  -H "Authorization: Bearer <CLAUDE_REMOTE_API_SECRET>" \
   -H "Content-Type: application/json" \
   -d '{"message": "Task done", "title": "ClaudeRemote", "priority": 3}'
 ```
@@ -205,7 +210,6 @@ See [docs/doppler.md](docs/doppler.md) for the full secrets reference.
 | Add Claude Code skills | Add `.md` files to `skills/`, re-run `./setup/03-install-claude.sh` |
 | Replace Claude theme | `claude theme export > config/claude-code-theme.json`, re-run `./setup/03-install-claude.sh` |
 | Add tmux layouts | Add scripts to `tmux/layouts/`, reference in `tmux/launch.sh` |
-| Add headless prompt templates | Add `.md` files to `agents/src/prompts/` |
 
 ---
 
@@ -219,13 +223,17 @@ claude-remote/
 ├── config/
 │   ├── repos.json            # Repos to clone for the claude-remote user
 │   └── claude-code-theme.json # Claude Code theme (replace with your export)
-├── docker/
-│   └── docker-compose.yml   # Postgres, Valkey, api, nanoclaw, watchtower
-├── agents/
+├── api/                      # claude-remote-api source (Elysia/Bun)
 │   ├── src/
-│   │   ├── trigger-handler.ts  # Agent SDK runner (worktree, PR, notify)
-│   │   └── prompts/            # Prompt templates (generic-fix, pr-review, daily-triage)
+│   │   ├── index.ts          # App entry point
+│   │   ├── clients/          # ntfy.ts, ticktick.ts
+│   │   ├── routes/           # health.ts, notify.ts, ticktick.ts, ticktick-auth.ts
+│   │   ├── cron/             # Token refresh jobs
+│   │   └── generated/        # TickTick OpenAPI SDK (auto-generated)
+│   ├── Dockerfile
 │   └── package.json
+├── docker/
+│   └── docker-compose.yml   # Postgres, Valkey, api, vibekanban, electric, azurite, nanoclaw, watchtower
 ├── skills/                   # Claude Code skills (copied to ~/.claude/skills/)
 │   ├── api-bridge.md
 │   ├── notify.md
@@ -233,7 +241,6 @@ claude-remote/
 │   ├── commit.md
 │   └── pr.md
 ├── scripts/
-│   ├── spawn-headless.sh     # CLI wrapper for trigger-handler.ts
 │   ├── notify.sh             # Quick NTFY notification sender
 │   ├── dc-up.sh              # Docker Compose up
 │   └── dc-down.sh            # Docker Compose down

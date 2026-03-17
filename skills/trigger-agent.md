@@ -1,41 +1,26 @@
 # Skill: /trigger-agent
 
-Spawn a headless Claude Code agent on another repo via the claude-remote-api. Use this when you need background work done on a different project while your current session continues.
+Orchestrate a headless Claude Code agent via Vibekanban. Vibekanban handles worktrees, PR creation, and status tracking natively.
 
 ---
 
-## Trigger a run
+## Create an agent task in Vibekanban
 
+**Via the UI** (recommended):
+Access Vibekanban at `http://localhost:3000` via SSH tunnel:
 ```bash
-curl -s -X POST http://localhost:4000/api/agents/trigger \
-  -H "Content-Type: application/json" \
-  -d '{
-    "repo": "<repo-name>",
-    "prompt": "<task description>",
-    "worktree": true
-  }'
+ssh -L 3000:localhost:3000 homelab
 ```
+Create a task in the kanban board — Vibekanban launches Claude in a git worktree, pushes a branch, and creates a PR when done.
 
-**Fields:**
-- `repo` — directory name under `~/SourceRoot/` (e.g. `basalt-ui`, `epos.student-enrolment`)
-- `prompt` — full task description for the headless agent
-- `worktree` — **always set `true`** for headless runs; creates an isolated git worktree to avoid conflicts with active tmux sessions
-
-The response includes an `id` for status polling.
-
----
-
-## Check status
-
-```bash
-curl -s http://localhost:4000/api/agents/status/<id> | jq
-```
+**Via MCP** (from a Claude Code tmux session):
+If you have the vibe-kanban MCP configured (see MANUAL_TODOS.md M-06), use MCP tools directly from your Claude Code session to create and monitor tasks.
 
 ---
 
 ## Writing good prompts
 
-Be explicit. The agent has no conversation history — it starts fresh.
+Be explicit. The agent starts fresh with no conversation history.
 
 Include:
 - What to do (verb + scope)
@@ -44,13 +29,11 @@ Include:
 - Whether to create a PR when done
 
 Example:
-
-```json
-{
-  "repo": "basalt-ui",
-  "prompt": "Fix the failing TypeScript errors in src/components/Button.tsx. Run `bun typecheck` to confirm they're resolved. Create a branch fix/button-ts-errors and open a PR. Send a notification when done.",
-  "worktree": true
-}
+```
+Fix the failing TypeScript errors in src/components/Button.tsx.
+Run `bun typecheck` to confirm they're resolved.
+Create a branch fix/button-ts-errors and open a PR.
+Send a notification when done.
 ```
 
 ---
@@ -58,6 +41,5 @@ Example:
 ## When to use
 
 - Delegating a fix to a background agent while you continue interactive work
-- Responding to a webhook/alert (e.g. Sentry error → trigger fix agent)
 - Running a long-running task (PR review, daily triage) asynchronously
 - Any task that requires file changes on a different repo

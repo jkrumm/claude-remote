@@ -1,0 +1,23 @@
+{
+  "name": "claude-remote-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "generate": "bunx @hey-api/openapi-ts"
+  },
+  "dependencies": {
+    "@elysiajs/bearer": "^1",
+    "@elysiajs/swagger": "^1",
+    "@hey-api/client-fetch": "^0.13.1",
+    "croner": "^9",
+    "elysia": "^1.4.26"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.93.1",
+    "bun-types": "^1",
+    "typescript": "^5"
+  }
+}

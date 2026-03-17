@@ -42,10 +42,10 @@ services:
       retries: 5
 
   # --- Bridge API ---
-  # Build context: sibling repo ../claude-remote-api (not yet created — see MANUAL_TODOS.md)
+  # Build context: api/ directory in this repo (../api relative to docker/)
   claude-remote-api:
     build:
-      context: ${CLAUDE_REMOTE_API_PATH:-../claude-remote-api}
+      context: ${CLAUDE_REMOTE_API_PATH:-../api}
       dockerfile: Dockerfile
     container_name: claude-remote-api
     restart: unless-stopped
@@ -60,8 +60,9 @@ services:
       - NTFY_BASE_URL=${NTFY_BASE_URL}
       - NTFY_TOKEN=${NTFY_TOKEN}
       - NTFY_TOPIC=claude-remote
-      - HOMELAB_API_SECRET=${HOMELAB_API_SECRET}
-      - POSTGRES_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/claude-remote
+      - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
+    volumes:
+      - api-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 30s
@@ -69,8 +70,6 @@ services:
       retries: 3
     depends_on:
       postgres:
-        condition: service_healthy
-      valkey:
         condition: service_healthy
 
   # --- NanoClaw Telegram bot ---
@@ -86,9 +85,99 @@ services:
       - nanoclaw-data:/data
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - HOMELAB_API_URL=http://claude-remote-api:4000
+      - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
+      - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
+      - VIBEKANBAN_BASE_URL=http://vibekanban:3000
     depends_on:
       claude-remote-api:
+        condition: service_healthy
+
+  # --- Vibekanban AI agent orchestration ---
+  # Build from source: clone vibe-kanban to ~/SourceRoot/vibe-kanban (see MANUAL_TODOS.md M-06)
+  # Requires GitHub OAuth app (VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID/SECRET)
+  vibekanban:
+    build:
+      context: ${VIBEKANBAN_REPO_PATH:-../vibe-kanban}
+      dockerfile: crates/remote/Dockerfile
+    container_name: claude-remote-vibekanban
+    restart: unless-stopped
+    networks: [agent-net]
+    ports:
+      - "127.0.0.1:3000:8081"
+    environment:
+      - SERVER_DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/vibekanban
+      - SERVER_LISTEN_ADDR=0.0.0.0:8081
+      - ELECTRIC_URL=http://electric:3000
+      - VIBEKANBAN_REMOTE_JWT_SECRET=${VIBEKANBAN_JWT_SECRET}
+      - GITHUB_OAUTH_CLIENT_ID=${VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID:-}
+      - GITHUB_OAUTH_CLIENT_SECRET=${VIBEKANBAN_GITHUB_OAUTH_CLIENT_SECRET:-}
+      - SERVER_PUBLIC_BASE_URL=${VIBEKANBAN_PUBLIC_URL:-http://localhost:3000}
+      - AZURE_STORAGE_ACCOUNT_NAME=devstoreaccount1
+      - AZURE_STORAGE_ACCOUNT_KEY=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+      - AZURE_STORAGE_CONTAINER_NAME=issue-attachments
+      - AZURE_STORAGE_ENDPOINT_URL=http://azurite:10000/devstoreaccount1
+      - AZURE_STORAGE_PUBLIC_ENDPOINT_URL=http://localhost:10000/devstoreaccount1
+      - ELECTRIC_ROLE_PASSWORD=${VIBEKANBAN_ELECTRIC_ROLE_PASSWORD:-remote}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite-init:
+        condition: service_completed_successfully
+
+  # --- ElectricSQL sync engine (for vibekanban) ---
+  electric:
+    image: electricsql/electric:1.4.13
+    container_name: claude-remote-electric
+    restart: unless-stopped
+    networks: [agent-net]
+    environment:
+      - DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/vibekanban?sslmode=disable
+      - AUTH_MODE=insecure
+      - ELECTRIC_INSECURE=true
+      - ELECTRIC_MANUAL_TABLE_PUBLISHING=true
+      - ELECTRIC_USAGE_REPORTING=false
+      - ELECTRIC_FEATURE_FLAGS=allow_subqueries,tagged_subqueries
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # --- Azure blob storage emulator (for vibekanban attachments) ---
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: claude-remote-azurite
+    restart: unless-stopped
+    networks: [agent-net]
+    command: "azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --loose --skipApiVersionCheck"
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      test: ["CMD", "nc", "127.0.0.1", "10000", "-z"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  azurite-init:
+    image: mcr.microsoft.com/azure-cli:latest
+    container_name: claude-remote-azurite-init
+    networks: [agent-net]
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        az storage container create --name issue-attachments 2>/dev/null || true
+        az storage cors add --services b --methods GET PUT POST DELETE OPTIONS --origins '*' --allowed-headers '*' --exposed-headers '*' --max-age 3600
+        echo "Azurite initialized"
+    depends_on:
+      azurite:
         condition: service_healthy
 
   # --- Watchtower (updates infra containers only) ---
@@ -104,12 +193,16 @@ services:
       WATCHTOWER_POLL_INTERVAL: "86400"
       WATCHTOWER_NO_STARTUP_MESSAGE: "true"
       WATCHTOWER_NOTIFICATIONS: "none"
-    # Only watches the three infra containers — not custom builds
+    # Only watches infra containers — not custom builds
     command: >
       claude-remote-postgres
       claude-remote-valkey
+      claude-remote-electric
+      claude-remote-azurite
       claude-remote-watchtower
 
 volumes:
   pgdata:
+  api-data:
   nanoclaw-data:
+  azurite-data:

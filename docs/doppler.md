@@ -17,13 +17,18 @@ All secrets live in one Doppler config — no sub-configs, no service tokens. `d
 | `NTFY_TOKEN` | claude-remote-api | Bearer token for NTFY auth |
 | `TICKTICK_CLIENT_ID` | claude-remote-api | From TickTick developer settings |
 | `TICKTICK_CLIENT_SECRET` | claude-remote-api | From TickTick developer settings |
-| `HOMELAB_API_SECRET` | claude-remote-api | Bearer token for API auth (generated) |
+| `CLAUDE_REMOTE_API_SECRET` | claude-remote-api + nanoclaw | Bearer token for API auth — `openssl rand -hex 32` |
 | `TELEGRAM_BOT_TOKEN` | nanoclaw container | From @BotFather — see MANUAL_TODOS.md M-04 |
+| `VIBEKANBAN_JWT_SECRET` | vibekanban container | `openssl rand -hex 32` — see MANUAL_TODOS.md M-06 |
+| `VIBEKANBAN_GITHUB_OAUTH_CLIENT_ID` | vibekanban container | GitHub OAuth app client ID — see MANUAL_TODOS.md M-06 |
+| `VIBEKANBAN_GITHUB_OAUTH_CLIENT_SECRET` | vibekanban container | GitHub OAuth app client secret — see MANUAL_TODOS.md M-06 |
 
 **Not in Doppler** (handled differently):
 - `NTFY_TOPIC` — hardcoded as `claude-remote` in docker-compose.yml
 - TickTick access/refresh tokens — stored in a persistent volume (`/data/ticktick-tokens.json`) by the API after OAuth flow
 - `HOMELAB_NETWORK_NAME` — defaults to `homelab_cloudflared` in compose; only add to Doppler if yours differs
+- `VIBEKANBAN_PUBLIC_URL` — defaults to `http://localhost:3000`; set if exposing via reverse proxy
+- `VIBEKANBAN_REPO_PATH` — defaults to `../vibe-kanban`; override only if cloned elsewhere
 
 ---
 
