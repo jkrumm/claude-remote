@@ -58,6 +58,7 @@ import {
   shouldDropMessage,
 } from './sender-allowlist.js';
 import { startSchedulerLoop } from './task-scheduler.js';
+import { startTokenRefreshLoop } from './token-refresh.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
@@ -482,6 +483,10 @@ async function main(): Promise<void> {
     CREDENTIAL_PROXY_PORT,
     PROXY_BIND_HOST,
   );
+
+  // Proactively refresh the OAuth token before it expires (8h lifetime).
+  // Runs once at startup (catches stale tokens) then every 6h.
+  startTokenRefreshLoop();
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
