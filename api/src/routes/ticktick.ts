@@ -30,6 +30,7 @@ function normalizeDueDate(body: Record<string, unknown>): Record<string, unknown
 
 export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
   .get('/projects', () => ticktickOps.getProjects(), {
+    response: t.Any({ description: 'Array of TickTick projects' }),
     detail: {
       tags: ['TickTick'],
       summary: 'Get all projects',
@@ -41,6 +42,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     ({ params }) => ticktickOps.getProjectData(params.projectId),
     {
       params: t.Object({ projectId: t.String() }),
+      response: t.Any({ description: 'Project with tasks and columns' }),
       detail: {
         tags: ['TickTick'],
         summary: 'Get project with tasks and columns',
@@ -53,18 +55,19 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
       {
         title: t.String(),
         projectId: t.Optional(t.String()),
-        dueDate: t.Optional(t.String()),
-        priority: t.Optional(t.Number()),
+        dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD or full ISO string. Server converts to ISO midnight UTC.' })),
+        priority: t.Optional(t.Number({ description: '0=none, 1=low, 3=medium, 5=high' })),
         content: t.Optional(t.String()),
         startDate: t.Optional(t.String()),
-        timeZone: t.Optional(t.String()),
+        timeZone: t.Optional(t.String({ description: 'IANA timezone, e.g. Europe/Berlin. Defaults to Europe/Berlin.' })),
         isAllDay: t.Optional(t.Boolean()),
       },
       { additionalProperties: true },
     ),
+    response: t.Any({ description: 'Created task object' }),
     detail: {
       tags: ['TickTick'],
-      summary: 'Create a task. dueDate accepts YYYY-MM-DD (server converts to ISO midnight UTC) or full ISO string.',
+      summary: 'Create a task',
       security: [{ BearerAuth: [] }],
     },
   })
@@ -81,16 +84,17 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
         {
           title: t.Optional(t.String()),
           projectId: t.Optional(t.String()),
-          dueDate: t.Optional(t.String()),
-          priority: t.Optional(t.Number()),
+          dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD or full ISO string' })),
+          priority: t.Optional(t.Number({ description: '0=none, 1=low, 3=medium, 5=high' })),
           content: t.Optional(t.String()),
-          status: t.Optional(t.Number()),
+          status: t.Optional(t.Number({ description: '0=active, 2=completed' })),
         },
         { additionalProperties: true },
       ),
+      response: t.Any({ description: 'Updated task object' }),
       detail: {
         tags: ['TickTick'],
-        summary: 'Update a task. dueDate accepts YYYY-MM-DD or full ISO string.',
+        summary: 'Update a task',
         security: [{ BearerAuth: [] }],
       },
     },
@@ -100,6 +104,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     ({ params }) => ticktickOps.completeTask(params.projectId, params.taskId),
     {
       params: t.Object({ projectId: t.String(), taskId: t.String() }),
+      response: t.Any({ description: 'Completion result' }),
       detail: {
         tags: ['TickTick'],
         summary: 'Mark task as complete',
@@ -112,6 +117,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     ({ params }) => ticktickOps.deleteTask(params.projectId, params.taskId),
     {
       params: t.Object({ projectId: t.String(), taskId: t.String() }),
+      response: t.Any({ description: 'Deletion result' }),
       detail: {
         tags: ['TickTick'],
         summary: 'Delete a task',

@@ -17,6 +17,11 @@ export const notifyRoute = new Elysia().post(
       title: t.Optional(t.String()),
       priority: t.Optional(t.Number({ minimum: 1, maximum: 5 })),
     }),
-    detail: { summary: "Send an NTFY notification", tags: ["Notify"] },
+    response: t.Object({ ok: t.Literal(true) }),
+    detail: {
+      summary: "Send an NTFY notification",
+      tags: ["Notify"],
+      security: [{ BearerAuth: [] }],
+    },
   },
 );

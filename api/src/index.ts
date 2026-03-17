@@ -27,7 +27,13 @@ new Elysia()
       provider: "scalar",
       path: "/docs",
       documentation: {
-        info: { title: "claude-remote-api", version: "0.1.0" },
+        info: {
+          title: "claude-remote-api",
+          version: "0.1.0",
+          description:
+            "Personal backend proxy for TickTick task management and NTFY push notifications. All endpoints except /health and /ticktick/auth/* require Bearer token authentication.",
+        },
+        servers: [{ url: "https://api.jkrumm.com", description: "Production" }],
         components: {
           securitySchemes: {
             BearerAuth: { type: "http", scheme: "bearer" },
