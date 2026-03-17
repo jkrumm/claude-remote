@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
 
-const GITHUB_TOKEN = process.env.CLAUDE_REMOTE_API_GITHUB_TOKEN ?? ''
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? ''
 const GITHUB_API = 'https://api.github.com'
 
 // Transparent passthrough proxy — injects Authorization header and forwards
