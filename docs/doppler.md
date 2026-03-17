@@ -1,67 +1,61 @@
 # Doppler Secrets Reference
 
 **Project**: `claude-remote`
+**Single config**: `prod`
 
-All secrets are managed in Doppler — no `.env` files anywhere in this project. Each service gets its own config (scoped environment) and, for Docker containers, its own service token so containers can only read their own secrets.
+All secrets live in one Doppler config — no sub-configs, no service tokens. `doppler run --config prod` injects everything the compose stack needs as env vars at startup. No Doppler CLI inside containers.
 
 ---
 
-## Configs
+## `prod` Secrets
 
-| Config | Used by | Contains |
+| Secret | Used by | Notes |
 |-|-|-|
-| `prod` | claude-remote user shell, setup scripts | `GITHUB_TOKEN`, general env vars |
-| `prod` | `dc-up.sh` / `docker compose up` | All secrets for the entire compose stack (see below) |
+| `GITHUB_TOKEN` | setup/06-setup-gh-cli.sh | Fine-grained PAT — see MANUAL_TODOS.md M-02 |
+| `POSTGRES_PASSWORD` | postgres container + api | Strong random password |
+| `NTFY_BASE_URL` | claude-remote-api | e.g. `https://ntfy.jkrumm.com` |
+| `NTFY_TOKEN` | claude-remote-api | Bearer token for NTFY auth |
+| `TICKTICK_CLIENT_ID` | claude-remote-api | From TickTick developer settings |
+| `TICKTICK_CLIENT_SECRET` | claude-remote-api | From TickTick developer settings |
+| `HOMELAB_API_SECRET` | claude-remote-api | Bearer token for API auth (generated) |
+| `TELEGRAM_BOT_TOKEN` | nanoclaw container | From @BotFather — see MANUAL_TODOS.md M-04 |
 
-**`prod` secrets:**
-
-| Secret | Used by |
-|-|-|
-| `POSTGRES_PASSWORD` | postgres container + api connection string |
-| `NTFY_BASE_URL` | claude-remote-api (NTFY push) |
-| `NTFY_TOPIC` | claude-remote-api (NTFY push) |
-| `TICKTICK_CLIENT_ID` | claude-remote-api |
-| `TICKTICK_CLIENT_SECRET` | claude-remote-api |
-| `TICKTICK_ACCESS_TOKEN` | claude-remote-api |
-| `TELEGRAM_BOT_TOKEN` | nanoclaw container |
-| `HOMELAB_NETWORK_NAME` | compose external network (default: `homelab_cloudflared`) |
+**Not in Doppler** (handled differently):
+- `NTFY_TOPIC` — hardcoded as `claude-remote` in docker-compose.yml
+- TickTick access/refresh tokens — stored in a persistent volume (`/data/ticktick-tokens.json`) by the API after OAuth flow
+- `HOMELAB_NETWORK_NAME` — defaults to `homelab_cloudflared` in compose; only add to Doppler if yours differs
 
 ---
 
 ## Usage Patterns
 
-### Shell — inject secrets into a command
+### Start the Docker stack
 
 ```bash
-# Run a command with all secrets from the dev config injected as env vars
-doppler run --project claude-remote --config dev -- bun test
-
-# Shorthand if doppler is configured for this project directory
-doppler run -- bun test
-```
-
-### Docker Compose — start stack with secrets
-
-```bash
-# Starts postgres, valkey, api, nanoclaw, watchtower
-doppler run --project claude-remote --config prod -- docker compose -f docker/docker-compose.yml up -d
-
-# Or use the wrapper script (does the same thing)
+# Via wrapper script (recommended)
 ./scripts/dc-up.sh
+
+# Or directly
+doppler run --project claude-remote --config prod -- \
+  docker compose -f docker/docker-compose.yml up -d
 ```
 
-The compose file reads `DOPPLER_TOKEN_API` and `DOPPLER_TOKEN_NANOCLAW` from the `prod` config and passes them to the respective containers. Each container then uses its own Doppler service token to fetch its own secrets at startup.
-
-### Claude Code — read a secret in a session
+### Read a secret (e.g. in a Claude Code session)
 
 ```bash
-doppler secrets get TICKTICK_API_KEY --project claude-remote --config api --plain
+doppler secrets get POSTGRES_PASSWORD --project claude-remote --config prod --plain
 ```
 
-### Write a secret
+### Set or update a secret
 
 ```bash
-doppler secrets set NEW_KEY=value --project claude-remote --config api
+doppler secrets set MY_KEY=value --project claude-remote --config prod
+```
+
+### Run any command with secrets injected
+
+```bash
+doppler run --project claude-remote --config prod -- <command>
 ```
 
 ---
@@ -72,30 +66,23 @@ doppler secrets set NEW_KEY=value --project claude-remote --config api
 # Authenticate (one-time, per machine)
 doppler login
 
-# Configure project for this directory
-doppler setup
+# List all secrets
+doppler secrets --project claude-remote --config prod
 
-# List all secrets in a config
-doppler secrets --project claude-remote --config dev
-
-# Get one secret (plain text, no quotes)
-doppler secrets get MY_KEY --project claude-remote --config dev --plain
+# Get one secret (plain text)
+doppler secrets get MY_KEY --project claude-remote --config prod --plain
 
 # Set a secret
-doppler secrets set MY_KEY=value --project claude-remote --config dev
+doppler secrets set MY_KEY=value --project claude-remote --config prod
 
 # Delete a secret
-doppler secrets delete MY_KEY --project claude-remote --config dev
-
-# List all configs in the project
-doppler configs --project claude-remote
+doppler secrets delete MY_KEY --project claude-remote --config prod
 ```
 
 ---
 
 ## Notes
 
-- `prod` is the naming convention Doppler requires when an environment is `prd` and the config branch is `docker`. Doppler prefixes branch configs with the environment slug.
-- The `claude-remote` user on the homelab needs to authenticate Doppler separately: `sudo -u claude-remote -i doppler login`.
-- The `dev` config is for interactive use by the claude-remote user. It does not contain Docker-specific secrets.
-- Never commit secrets, `.env` files, or service tokens to git. All values live exclusively in Doppler.
+- Only `jkrumm` (the sudo user running setup) needs Doppler CLI authenticated — the `claude-remote` user itself does not use Doppler directly.
+- Never commit secrets or `.env` files to git. All values live exclusively in Doppler.
+- To add a new secret needed by the compose stack: `doppler secrets set KEY=value --config prod`, then `./scripts/dc-up.sh` (docker compose picks up new env vars on next `up`).

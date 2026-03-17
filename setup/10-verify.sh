@@ -70,10 +70,11 @@ curl -sf http://localhost:4000/health &>/dev/null \
 
 echo ""
 echo "=== Git ==="
-run_as_user 'ssh -T git@github.com 2>&1' | grep -qi "successfully\|hi " \
-  && check "GitHub SSH (claude-remote)" "ok" || check "GitHub SSH (claude-remote)" "fail" "deploy key not added (M-02)"
 run_as_user 'gh auth status 2>&1' | grep -qi "logged in\|authenticated" \
-  && check "gh CLI (claude-remote)" "ok" || check "gh CLI (claude-remote)" "fail" "auth required (M-03)"
+  && check "gh CLI (claude-remote)" "ok" || check "gh CLI (claude-remote)" "fail" "auth required — run setup/06-setup-gh-cli.sh (M-02)"
+run_as_user 'gh api /user --jq .login 2>/dev/null' | grep -q "." \
+  && check "GitHub API access" "ok" "$(run_as_user 'gh api /user --jq .login 2>/dev/null')" \
+  || check "GitHub API access" "fail" "token may lack repo permissions"
 
 echo ""
 echo "=== Claude Code ==="

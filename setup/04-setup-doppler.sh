@@ -30,10 +30,13 @@ EOF
 fi
 
 echo ""
-echo "Doppler is installed. The claude-remote user's Doppler auth is managed"
-echo "via service tokens configured in docker-compose — no interactive login needed"
-echo "for the claude-remote user itself."
+echo "Doppler is installed."
+echo "Only the host sudo user needs Doppler auth — claude-remote user does not."
 echo ""
-echo "For the jkrumm user on this machine, authenticate with:"
+echo "Authenticate on this machine (if not already done):"
 echo "  doppler login"
 echo "  doppler setup --project claude-remote --config prod"
+echo ""
+echo "Then populate secrets (see MANUAL_TODOS.md M-03):"
+echo "  doppler secrets set POSTGRES_PASSWORD=... NTFY_TOKEN=... etc."
+echo "  --project claude-remote --config prod"

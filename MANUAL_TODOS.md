@@ -48,7 +48,6 @@ doppler secrets set \
   NTFY_TOPIC=<your-ntfy-topic> \
   TICKTICK_CLIENT_ID=<see-ticktick-developer-settings> \
   TICKTICK_CLIENT_SECRET=<see-ticktick-developer-settings> \
-  TICKTICK_ACCESS_TOKEN=<oauth-token> \
   --project claude-remote --config prod
 ```
 `TELEGRAM_BOT_TOKEN` is added separately in M-04. `HOMELAB_NETWORK_NAME` defaults to `homelab_cloudflared` in compose — only set if yours differs.
@@ -73,7 +72,7 @@ doppler secrets set \
 ```bash
 ssh homelab
 cd ~/SourceRoot/claude-remote
-doppler run --project claude-remote --config prd_docker -- docker compose -f docker/docker-compose.yml up -d
+./scripts/dc-up.sh
 ./setup/10-verify.sh
 ```
 **Status**: PENDING

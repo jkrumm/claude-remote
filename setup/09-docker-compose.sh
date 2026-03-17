@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Start the Docker Compose stack (infra only: postgres + valkey).
-# Full stack (api, nanoclaw) requires Doppler service tokens — see MANUAL_TODOS.md M-05.
+# Full stack (api, nanoclaw) requires Doppler prod secrets — see MANUAL_TODOS.md M-03.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,7 +25,7 @@ fi
 if ! doppler secrets get POSTGRES_PASSWORD --project claude-remote --config prod --plain &>/dev/null 2>&1; then
   echo ""
   echo "  [skip] POSTGRES_PASSWORD not set in Doppler (project: claude-remote, config: prod)"
-  echo "  Complete M-05 in MANUAL_TODOS.md to populate Docker secrets, then re-run this script."
+  echo "  Complete M-03 in MANUAL_TODOS.md to populate Doppler prod secrets, then re-run this script."
   echo ""
   exit 0
 fi
@@ -60,4 +60,4 @@ echo "Stack status:"
 docker compose -f "$REPO_ROOT/docker/docker-compose.yml" ps 2>/dev/null || true
 echo ""
 echo "Docker Compose setup complete."
-echo "Note: claude-remote-api and nanoclaw require M-05 (Doppler service tokens) before starting."
+echo "Note: claude-remote-api and nanoclaw require M-03 (Doppler prod secrets) before starting."

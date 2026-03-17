@@ -42,13 +42,12 @@ curl -s -X POST http://localhost:4000/api/notify \
 
 ---
 
-## SSH / HTTPS fallback
+## If `git push` fails
 
-The `claude-remote` user authenticates with GitHub via a per-repo deploy key.
-If `git push` fails with a permission error on a repo that doesn't have a deploy key configured:
+The `claude-remote` user uses HTTPS authenticated via `gh` CLI. If push fails, verify the remote URL is HTTPS (not SSH) and that `gh auth status` shows authenticated:
 
 ```bash
-# Switch remote to HTTPS (uses gh CLI auth)
+# Ensure remote is HTTPS
 git remote set-url origin https://github.com/<org>/<repo>.git
 git push -u origin HEAD
 ```

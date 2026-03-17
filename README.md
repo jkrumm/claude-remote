@@ -55,13 +55,11 @@ These require browser access or external services and cannot be automated:
 
 | Step | Command / Action |
 |-|-|
-| **Claude Code OAuth** | `sudo -u claude-remote -i claude auth login` |
-| **Doppler auth** | `doppler login` then `doppler setup` |
-| **GitHub deploy key** | Get key: `sudo cat /home/claude-remote/.ssh/id_ed25519.pub` → add to each repo in GitHub Settings → Deploy keys |
-| **gh CLI auth** | `sudo -u claude-remote -i gh auth login --with-token` (see MANUAL_TODOS.md) |
+| **Claude Code OAuth** | `ssh cr` then `claude auth login` |
+| **Doppler auth** | On the host: `doppler login` then populate secrets (see MANUAL_TODOS.md M-03) |
+| **gh CLI auth** | Run `sudo bash setup/06-setup-gh-cli.sh` — guided PAT setup (see MANUAL_TODOS.md M-02) |
 | **Add repos** | Edit `config/repos.json`, then re-run `./setup/07-clone-repos.sh` |
-| **Doppler service tokens** | Create tokens for `api` and `nanoclaw` configs (see MANUAL_TODOS.md M-05) |
-| **NanoClaw Telegram bot** | Create via @BotFather, store token in Doppler (see MANUAL_TODOS.md M-06) |
+| **NanoClaw Telegram bot** | Create via @BotFather, store token in Doppler (see MANUAL_TODOS.md M-04) |
 
 See [MANUAL_TODOS.md](MANUAL_TODOS.md) for the full checklist with exact commands.
 
@@ -79,7 +77,7 @@ This starts: Postgres, Valkey, claude-remote-api, NanoClaw, and Watchtower.
 ./setup/10-verify.sh
 ```
 
-Checks user isolation, installed tools, Docker stack health, API connectivity, GitHub SSH, gh CLI auth, and Doppler connection.
+Checks user isolation, installed tools, Docker stack health, API connectivity, gh CLI auth, and Claude Code auth.
 
 ### 6. Launch your first session
 
@@ -118,7 +116,7 @@ launch <repo-name>
 │  │  └── valkey             :6379 (localhost)    │   │
 │  └──────────────────────────────────────────────┘   │
 │                                                      │
-│  External: GitHub (SSH deploy keys), Doppler         │
+│  External: GitHub (HTTPS + PAT), Doppler             │
 │            Telegram Bot API, NTFY push               │
 └──────────────────────────────────────────────────────┘
 ```
@@ -174,11 +172,11 @@ curl -X POST http://localhost:4000/api/notify \
 | Concern | Mitigation |
 |-|-|
 | Agent modifies host services | Separate Docker network; no Docker socket for agents |
-| Agent pushes to protected branches | GitHub branch protection + per-repo deploy key |
+| Agent pushes to protected branches | GitHub branch protection rules |
 | Agent installs system packages | No sudo, restricted PATH |
 | Agent accesses host filesystem | claude-remote user sees only `~/SourceRoot/` and `~/` |
 | Agent manages Docker | `docker` not in PATH; no socket access |
-| Agent reads other services' secrets | Doppler scoping: each service gets its own service token |
+| Agent reads other services' secrets | Secrets injected only into Docker containers at startup, not exposed to the claude-remote user |
 | NanoClaw escapes container | No Docker socket, no host mounts, agent-net only |
 | Simultaneous agent conflicts | Git worktrees for all headless runs |
 | Runaway token usage | Max subscription rate limits + `--max-turns` on headless |
