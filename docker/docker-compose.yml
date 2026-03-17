@@ -55,7 +55,12 @@ services:
     ports:
       - "127.0.0.1:4000:4000"
     environment:
-      - DOPPLER_TOKEN=${DOPPLER_TOKEN_API}
+      - TICKTICK_CLIENT_ID=${TICKTICK_CLIENT_ID}
+      - TICKTICK_CLIENT_SECRET=${TICKTICK_CLIENT_SECRET}
+      - TICKTICK_ACCESS_TOKEN=${TICKTICK_ACCESS_TOKEN}
+      - NTFY_BASE_URL=${NTFY_BASE_URL}
+      - NTFY_TOPIC=${NTFY_TOPIC}
+      - POSTGRES_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/claude-remote
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 30s
@@ -79,7 +84,8 @@ services:
     volumes:
       - nanoclaw-data:/data
     environment:
-      - DOPPLER_TOKEN=${DOPPLER_TOKEN_NANOCLAW}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - HOMELAB_API_URL=http://claude-remote-api:4000
     depends_on:
       claude-remote-api:
         condition: service_healthy

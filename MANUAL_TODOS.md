@@ -36,29 +36,22 @@ PAT permissions required:
 
 ---
 
-### M-03: Doppler service tokens for Docker containers
-**Why it's manual**: Requires creating configs and service tokens in Doppler
+### M-03: Populate Doppler prod_docker config
+**Why it's manual**: Requires knowing your actual secret values
 **Command/Action**:
-1. Create configs (if not already present):
+Populate the `prod_docker` config with all secrets needed by the compose stack.
+Run from your Mac (Doppler CLI authenticated):
 ```bash
-doppler configs create --project claude-remote --environment prd --name api
-doppler configs create --project claude-remote --environment prd --name nanoclaw
-doppler configs create --project claude-remote --environment prd --name docker
+doppler secrets set \
+  POSTGRES_PASSWORD=<strong-random-password> \
+  NTFY_BASE_URL=<your-ntfy-url> \
+  NTFY_TOPIC=<your-ntfy-topic> \
+  TICKTICK_CLIENT_ID=<see-ticktick-developer-settings> \
+  TICKTICK_CLIENT_SECRET=<see-ticktick-developer-settings> \
+  TICKTICK_ACCESS_TOKEN=<oauth-token> \
+  --project claude-remote --config prod_docker
 ```
-2. Populate `prd_api` secrets:
-```bash
-doppler secrets set NTFY_BASE_URL=<url> NTFY_TOPIC=<topic> POSTGRES_URL=postgres://claude-remote:<pw>@postgres:5432/claude-remote --project claude-remote --config prd_api
-```
-3. Create service tokens:
-```bash
-API_TOKEN=$(doppler service-tokens create --project claude-remote --config prd_api --plain api-token)
-NANO_TOKEN=$(doppler service-tokens create --project claude-remote --config prd_nanoclaw --plain nanoclaw-token)
-```
-4. Store in docker config:
-```bash
-doppler secrets set DOPPLER_TOKEN_API="$API_TOKEN" DOPPLER_TOKEN_NANOCLAW="$NANO_TOKEN" POSTGRES_PASSWORD=<strong-password> HOMELAB_NETWORK_NAME=homelab_cloudflared --project claude-remote --config prd_docker
-```
-**Note**: `prd_nanoclaw` needs `TELEGRAM_BOT_TOKEN` from M-04 before starting the nanoclaw container.
+`TELEGRAM_BOT_TOKEN` is added separately in M-04. `HOMELAB_NETWORK_NAME` defaults to `homelab_cloudflared` in compose — only set if yours differs.
 **Status**: PENDING
 
 ---

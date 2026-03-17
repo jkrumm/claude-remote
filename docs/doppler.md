@@ -10,10 +10,21 @@ All secrets are managed in Doppler — no `.env` files anywhere in this project.
 
 | Config | Used by | Contains |
 |-|-|-|
-| `dev` / `prod` | claude-remote user shell | `GITHUB_TOKEN`, general env vars |
-| `prod_docker` | docker-compose at launch time | `POSTGRES_PASSWORD`, `DOPPLER_TOKEN_API`, `DOPPLER_TOKEN_NANOCLAW`, `HOMELAB_NETWORK_NAME` |
-| `api` (env: `prd`) | claude-remote-api container | `TICKTICK_API_KEY`, `NTFY_BASE_URL`, `NTFY_TOPIC`, `POSTGRES_URL` |
-| `nanoclaw` (env: `prd`) | NanoClaw container | `TELEGRAM_BOT_TOKEN`, `HOMELAB_API_URL` |
+| `prod` | claude-remote user shell, setup scripts | `GITHUB_TOKEN`, general env vars |
+| `prod_docker` | `dc-up.sh` / `docker compose up` | All secrets for the entire compose stack (see below) |
+
+**`prod_docker` secrets:**
+
+| Secret | Used by |
+|-|-|
+| `POSTGRES_PASSWORD` | postgres container + api connection string |
+| `NTFY_BASE_URL` | claude-remote-api (NTFY push) |
+| `NTFY_TOPIC` | claude-remote-api (NTFY push) |
+| `TICKTICK_CLIENT_ID` | claude-remote-api |
+| `TICKTICK_CLIENT_SECRET` | claude-remote-api |
+| `TICKTICK_ACCESS_TOKEN` | claude-remote-api |
+| `TELEGRAM_BOT_TOKEN` | nanoclaw container |
+| `HOMELAB_NETWORK_NAME` | compose external network (default: `homelab_cloudflared`) |
 
 ---
 
@@ -52,47 +63,6 @@ doppler secrets get TICKTICK_API_KEY --project claude-remote --config api --plai
 ```bash
 doppler secrets set NEW_KEY=value --project claude-remote --config api
 ```
-
----
-
-## Setting Up a New Service
-
-When adding a new service that needs its own secrets:
-
-1. **Create a config** for the service:
-   ```bash
-   doppler configs create --project claude-remote --environment prd my-service
-   ```
-
-2. **Add required secrets** to the new config:
-   ```bash
-   doppler secrets set MY_SECRET=value --project claude-remote --config my-service
-   ```
-
-3. **Create a service token** (read-only, for the container):
-   ```bash
-   doppler service-tokens create --project claude-remote --config my-service my-service-token
-   # Copy the token value — it's shown only once
-   ```
-
-4. **Store the service token** in `prod_docker` so docker-compose can pass it:
-   ```bash
-   doppler secrets set DOPPLER_TOKEN_MYSERVICE=<token> --project claude-remote --config prod_docker
-   ```
-
-5. **In docker-compose.yml**, pass the token to the container:
-   ```yaml
-   my-service:
-     environment:
-       - DOPPLER_TOKEN=${DOPPLER_TOKEN_MYSERVICE}
-   ```
-
-6. **In the Dockerfile**, install the Doppler CLI and use it as the entrypoint:
-   ```dockerfile
-   RUN curl -Ls https://cli.doppler.com/install.sh | sh
-   ENTRYPOINT ["doppler", "run", "--"]
-   CMD ["bun", "run", "start"]
-   ```
 
 ---
 
