@@ -105,7 +105,7 @@ services:
     ports:
       - "127.0.0.1:3000:8081"
     environment:
-      - SERVER_DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/vibekanban
+      - SERVER_DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/remote
       - SERVER_LISTEN_ADDR=0.0.0.0:8081
       - ELECTRIC_URL=http://electric:3000
       - VIBEKANBAN_REMOTE_JWT_SECRET=${VIBEKANBAN_JWT_SECRET}
@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
     networks: [agent-net]
     environment:
-      - DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/vibekanban?sslmode=disable
+      - DATABASE_URL=postgresql://claude-remote:${POSTGRES_PASSWORD}@postgres:5432/remote?sslmode=disable
       - AUTH_MODE=insecure
       - ELECTRIC_INSECURE=true
       - ELECTRIC_MANUAL_TABLE_PUBLISHING=true
@@ -180,25 +180,7 @@ services:
       azurite:
         condition: service_healthy
 
-  # --- Watchtower (updates infra containers only) ---
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: claude-remote-watchtower
-    restart: unless-stopped
-    networks: [agent-net]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_POLL_INTERVAL: "86400"
-      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
-    # Only watches infra containers — not custom builds
-    command: >
-      claude-remote-postgres
-      claude-remote-valkey
-      claude-remote-electric
-      claude-remote-azurite
-      claude-remote-watchtower
+  # Watchtower removed — homelab already runs its own watchtower that covers infra images
 
 volumes:
   pgdata:

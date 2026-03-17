@@ -18,12 +18,6 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install Doppler CLI
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
-    && curl -Ls https://cli.doppler.com/install.sh | sh \
-    && apt-get purge -y curl && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy built output and production deps
 COPY --from=builder /build/dist ./dist
 COPY --from=builder /build/node_modules ./node_modules
@@ -31,7 +25,6 @@ COPY --from=builder /build/package.json ./package.json
 
 # Persistent data dir (SQLite, config)
 RUN mkdir -p /data
-VOLUME ["/data"]
 
 ENV NODE_ENV=production
 
@@ -39,6 +32,5 @@ ENV NODE_ENV=production
 RUN useradd -r -u 1001 nanoclaw && chown nanoclaw /data /app
 USER nanoclaw
 
-# Doppler injects all secrets at container startup
-ENTRYPOINT ["doppler", "run", "--"]
+# Secrets are injected by doppler run in docker-compose (not inside the container)
 CMD ["node", "dist/index.js"]
