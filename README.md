@@ -271,7 +271,14 @@ claude-remote/
 │   ├── src/
 │   │   ├── index.ts          # App entry point
 │   │   ├── clients/          # ntfy.ts, ticktick.ts
-│   │   ├── routes/           # health.ts, notify.ts, ticktick.ts, ticktick-auth.ts
+│   │   ├── routes/
+│   │   │   ├── health.ts         # GET /health (unauthenticated)
+│   │   │   ├── notify.ts         # POST /api/notify — send ntfy push
+│   │   │   ├── ticktick.ts       # CRUD /ticktick/* — task management
+│   │   │   ├── ticktick-auth.ts  # OAuth flow /ticktick/auth/*
+│   │   │   ├── homelab.ts        # GET /homelab/uptime-kuma/*, /homelab/ntfy/*
+│   │   │   ├── github.ts         # Transparent proxy /github/api/* → api.github.com
+│   │   │   └── docker.ts         # GET /docker/summary|containers|stats|logs/:name
 │   │   ├── cron/             # Token refresh jobs
 │   │   └── generated/        # TickTick OpenAPI SDK (auto-generated)
 │   ├── Dockerfile

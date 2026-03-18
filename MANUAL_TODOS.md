@@ -7,6 +7,27 @@ Check off items as you complete them.
 
 ## Pending
 
+### M-10: Create 'remote' postgres database (vibekanban + electric)
+**Why it's manual**: The `remote` database is used by vibekanban and electric but postgres only creates `claude-remote` on first boot. Without it both containers crash-loop.
+**Command/Action**:
+```bash
+docker exec claude-remote-postgres psql -U claude-remote -c 'CREATE DATABASE remote;'
+```
+Run this once after first deploy. Idempotent — safe to re-run (will error if already exists, but that's fine).
+**Status**: DONE ✓ (2026-03-18)
+
+---
+
+### M-11: VPS Docker monitoring (future)
+**Why it's manual**: Requires running a docker-socket-proxy on the VPS, exposing it over Tailscale, and adding a second Docker endpoint set to claude-remote-api.
+**What's needed**:
+1. Run `tecnativa/docker-socket-proxy` on the VPS, bind to Tailscale IP
+2. Add `VPS_DOCKER_PROXY_URL=http://<tailscale-ip>:2375` to Doppler
+3. Add `/vps/docker/*` routes (same shape as `/docker/*` but pointing at the VPS proxy)
+**Status**: PENDING — not started
+
+---
+
 ### M-02: gh CLI auth for claude-remote user
 **Why it's manual**: Requires creating a GitHub fine-grained PAT in the browser
 **Command/Action**:
