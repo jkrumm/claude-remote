@@ -1,3 +1,5 @@
+name: claude-remote
+
 networks:
   agent-net:
     driver: bridge
