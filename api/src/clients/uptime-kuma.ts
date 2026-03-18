@@ -9,12 +9,12 @@ export interface UptimeMonitor {
   id: string
   name: string
   type: string
-  url: string
+  url: string | null // null for docker, group, push monitors
   active: boolean
   status: number // 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE
-  ping: number | null
-  uptime1d: number | null
-  uptime30d: number | null
+  ping: number | null // ms; null for docker and push monitors
+  uptime1d: number | null // ratio 0.0–1.0; null for push monitors
+  uptime30d: number | null // ratio 0.0–1.0; null for push monitors
 }
 
 interface RawMonitor {
@@ -104,7 +104,9 @@ async function fetchViaSocketIO(): Promise<
 
     socket.on('monitorList', (data: Record<string, RawMonitor>) => {
       for (const [id, m] of Object.entries(data)) {
-        monitorMeta.set(id, { name: m.name, type: m.type, url: m.url ?? '', active: m.active })
+        const rawUrl = m.url ?? ''
+        const url = rawUrl === '' || rawUrl === 'https://' ? null : rawUrl
+        monitorMeta.set(id, { name: m.name, type: m.type, url, active: m.active })
         pendingIds.add(id)
       }
       monitorListReceived = true

@@ -2,15 +2,23 @@ import { Elysia, t } from 'elysia'
 import { fetchMonitors } from '../clients/uptime-kuma'
 
 const MonitorSchema = t.Object({
-  id: t.String(),
-  name: t.String(),
-  type: t.String(),
-  url: t.String(),
-  active: t.Boolean(),
+  id: t.String({ description: 'UptimeKuma monitor ID' }),
+  name: t.String({ description: 'Display name' }),
+  type: t.String({ description: 'Monitor type: http, keyword, docker, push, mysql, group, …' }),
+  url: t.Union([t.String(), t.Null()], {
+    description: 'Target URL. Null for docker, group, and push monitors.',
+  }),
+  active: t.Boolean({ description: 'Whether the monitor is enabled in UptimeKuma' }),
   status: t.Number({ description: '0=DOWN 1=UP 2=PENDING 3=MAINTENANCE' }),
-  ping: t.Union([t.Number(), t.Null()]),
-  uptime1d: t.Union([t.Number(), t.Null()]),
-  uptime30d: t.Union([t.Number(), t.Null()]),
+  ping: t.Union([t.Number(), t.Null()], {
+    description: 'Response latency in milliseconds. Null for docker and push monitors.',
+  }),
+  uptime1d: t.Union([t.Number(), t.Null()], {
+    description: 'Uptime ratio over last 24 h (0.0–1.0). Null for push monitors.',
+  }),
+  uptime30d: t.Union([t.Number(), t.Null()], {
+    description: 'Uptime ratio over last 30 days (0.0–1.0). Null for push monitors.',
+  }),
 })
 
 export const uptimeKumaRoutes = new Elysia({ prefix: '/uptime-kuma' })
