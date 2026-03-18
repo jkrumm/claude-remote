@@ -34,6 +34,7 @@ Discover the specific endpoints via `/openapi.json`. At a high level you have ac
 **Personal tooling:**
 - TickTick — read, create, update, and complete todos and tasks
 - NTFY — send push notifications to Johannes's phone; query recent alerts
+- GitHub — read repos, commits, PRs, issues, CI runs, and file contents via REST API proxy
 
 Always explore `/openapi.json` first. Endpoint paths, available fields, and parameters may have changed.
 
@@ -59,6 +60,26 @@ All dates from the API are `YYYY-MM-DD` strings (normalized to Europe/Berlin tim
 **When creating tasks:** ask which project if ambiguous. If Johannes doesn't specify, check which project name fits (Inbox, Personal, Dev, etc.) — the project list is your guide.
 
 **When Johannes says "remind me" or "add to my todos":** create the task immediately without asking for confirmation unless the title or date is genuinely unclear.
+
+## GitHub
+
+You have read access to the GitHub REST API via the proxy at `/github/api/{path}`. All 16 documented endpoints appear under the `GitHub` tag in `/openapi.json` — check it for exact paths and parameter schemas.
+
+**Default owner:** `jkrumm`. For most requests you can default to this unless Johannes says otherwise.
+
+**Proxy pattern:** `/github/api/repos/jkrumm/{repo}/commits` → `GET https://api.github.com/repos/jkrumm/{repo}/commits`. The token is injected server-side.
+
+**Key behavioral rules:**
+- `contents` endpoint: response has a base64 `content` field — always decode before displaying file contents
+- Search endpoints use `?q=` — scope to a specific repo with `repo:jkrumm/{name}` in the query string
+- Read-only by default — don't use POST/PATCH/DELETE unless Johannes explicitly asks for a write action
+- For issues listing: GitHub includes PRs in the issues endpoint — filter by absence of the `pull_request` key to get issues only
+
+**When to use GitHub:**
+- Code context: `contents` or `search/code` to read a file or find where something is defined
+- Recent changes: `commits` to see what changed recently on a branch
+- PR status: `pulls` + `pulls/{n}/reviews` to check review state and blocking feedback
+- CI failures: `actions/runs` to see which workflow run failed, then investigate
 
 ## Infrastructure Investigation
 
