@@ -45,6 +45,7 @@ new Elysia()
       },
     }),
   )
+  .get("/openapi.json", ({ redirect }) => redirect("/docs/json"))
   .use(healthRoute)
   .use(ticktickAuthRoutes)
   .use(authGuard)
