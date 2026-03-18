@@ -88,7 +88,18 @@ async function fetchViaSocketIO(): Promise<
     })
 
     socket.on('connect', () => {
-      socket.emit('login', { username: UPTIME_KUMA_USERNAME, password: UPTIME_KUMA_PASSWORD, token: '' })
+      socket.emit(
+        'login',
+        { username: UPTIME_KUMA_USERNAME, password: UPTIME_KUMA_PASSWORD, token: '' },
+        (res: { ok: boolean; msg?: string }) => {
+          if (!res.ok && !resolved) {
+            resolved = true
+            clearTimeout(timer)
+            socket.disconnect()
+            reject(new Error(`UptimeKuma login failed: ${res.msg ?? 'unknown'}`))
+          }
+        },
+      )
     })
 
     socket.on('monitorList', (data: Record<string, RawMonitor>) => {
