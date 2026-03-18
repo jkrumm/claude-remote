@@ -68,6 +68,33 @@ Secrets are scoped to the `claude-remote` project in Doppler.
 
 ---
 
+## Nanoclaw Agent Context
+
+Nanoclaw runs Claude agents in Docker containers. Each group gets its own container with isolated filesystem. Agent context is controlled via layered CLAUDE.md files:
+
+| File | Scope | What it controls |
+|-|-|-|
+| `nanoclaw/groups/global/CLAUDE.md` | All groups | Identity, API access, formatting rules |
+| `nanoclaw/groups/main/CLAUDE.md` | Main/admin group | Group management, container mounts, elevated ops |
+| `nanoclaw/groups/telegram_main/CLAUDE.md` | Telegram main channel | Channel-specific formatting, session boot, infrastructure reporting |
+
+**Runtime location:** `~/nanoclaw-data/groups/{group}/CLAUDE.md` (Docker bind mount: `/data/groups/`)
+
+**Key facts:**
+- The Dockerfile does NOT bake group CLAUDE.md files into the image — they are runtime state on the bind mount
+- `groups/` is gitignored except for CLAUDE.md files (see `.gitignore` negation pattern)
+- When updating a CLAUDE.md: edit the repo file, commit/push, then also apply to the live server file at `~/nanoclaw-data/groups/{group}/CLAUDE.md`
+- `global/CLAUDE.md` is mounted read-only into every agent container at `/workspace/global/`
+- The `telegram_main` group CLAUDE.md layers on top of `main/CLAUDE.md` (main admin template)
+
+**To sync repo changes to the server:**
+```bash
+ssh cr "cat > ~/nanoclaw-data/groups/global/CLAUDE.md" < nanoclaw/groups/global/CLAUDE.md
+```
+No restart needed — CLAUDE.md is read fresh on each container spawn.
+
+---
+
 ## Shell aliases
 
 - `c` — `claude --dangerously-skip-permissions` — launches Claude Code without interactive permission prompts. Use this alias in tmux sessions and layout scripts.

@@ -13,6 +13,9 @@ nanoclaw/groups/global/*
 !nanoclaw/groups/main/
 nanoclaw/groups/main/*
 !nanoclaw/groups/main/CLAUDE.md
+!nanoclaw/groups/telegram_main/
+nanoclaw/groups/telegram_main/*
+!nanoclaw/groups/telegram_main/CLAUDE.md
 nanoclaw/logs/
 
 # Secrets (never commit)
