@@ -1,11 +1,8 @@
 #!/usr/bin/env tsx
 /**
- * One-time seed script: inserts 3 proactive monitoring tasks into nanoclaw's SQLite.
- * Safe to re-run — skips tasks that already exist by ID.
+ * @deprecated Superseded by api/src/routes/tasks.ts which seeds infra tasks at API startup.
  *
- * Usage (on server):
- *   cd ~/SourceRoot/claude-remote/nanoclaw
- *   tsx scripts/seed-monitoring-tasks.ts
+ * Kept for reference. Do not run — the claude-remote-api container handles seeding automatically.
  */
 
 import Database from 'better-sqlite3';

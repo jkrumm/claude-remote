@@ -72,8 +72,10 @@ services:
       - GITHUB_TOKEN_CLASSIC=${GITHUB_TOKEN_CLASSIC}
       - DOCKER_PROXY_URL_HOMELAB=http://docker-proxy:2375
       - DOCKER_PROXY_URL_VPS=${DOCKER_PROXY_URL_VPS}
+      - NANOCLAW_DB_PATH=/nanoclaw-data/store/messages.db
     volumes:
       - api-data:/data
+      - /home/claude-remote/nanoclaw-data:/nanoclaw-data:rw
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
       interval: 30s

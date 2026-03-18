@@ -129,15 +129,27 @@ Telegram renders a specific subset of markdown.
 
 Keep responses concise. This is a chat, not a report.
 
-## Proactive Monitoring
+## Scheduled Tasks
 
-Three scheduled tasks run automatically. You are always the agent.
+Tasks are managed via the claude-remote-api. Discover available endpoints via `/openapi.json` (tag: `Tasks`).
 
-- **Hourly health check** (`0 * * * *`): Silent unless state changes. Read/write `monitoring_state.json` in CWD. Alert via POST /ntfy/send only. Produce **no text output** — silence = healthy.
-- **Morning digest** (`30 7 * * *`): Telegram message — system status, overnight events, today's tasks.
-- **Evening wrap-up** (`0 23 * * *`): Telegram message — what was shipped, incidents resolved, tomorrow's tasks.
+**Key endpoints:**
+- `GET /tasks` — list all tasks with status, next_run, last_run, and whether they are infra-owned
+- `POST /tasks` — create a new task (prompt + schedule_type + schedule_value)
+- `PATCH /tasks/{id}` — update next_run (reschedule or trigger immediately) or status (pause/resume)
+- `DELETE /tasks/{id}` — delete user-created tasks (infra tasks are protected)
 
-**monitoring_state.json** lives at `/workspace/group/monitoring_state.json`. Format:
+**Three infrastructure tasks run automatically:**
+
+- `monitoring-hourly` (`0 * * * *`): Silent health check. Read/write `monitoring_state.json` in CWD. Alert via POST /ntfy/send only. **No text output — silence = healthy.**
+- `monitoring-morning` (`30 7 * * *`): Morning digest to Telegram — system status, overnight events, today's tasks.
+- `monitoring-evening` (`0 23 * * *`): Evening wrap-up to Telegram — shipped work, resolved incidents, tomorrow.
+
+**When asked "what crons/tasks are set up?"**: call `GET /tasks` and describe the results. Never say "none" without checking.
+
+**To trigger a task immediately**: `PATCH /tasks/{id}` with `{ "next_run": "<current ISO timestamp>" }`.
+
+**monitoring_state.json** lives at `/workspace/group/monitoring_state.json`. Used by the three infra tasks:
 ```json
 {
   "last_check": "2026-03-18T07:00:00.000Z",
@@ -151,10 +163,10 @@ Three scheduled tasks run automatically. You are always the agent.
 }
 ```
 
-Rules:
+Rules for monitoring_state.json:
 - Prune `events_24h` to entries younger than 48h. Never delete `active_issues` entries until resolved.
 - Issue keys use stable prefixes: `uptimekuma:{monitor-name}`, `docker:{env}:{container}`, `ntfy:alert:{id}`
-- For hourly check: initialise the file if missing, write it at the end regardless of findings
+- Initialise the file if missing, write it at the end of every hourly run regardless of findings.
 
 ---
 

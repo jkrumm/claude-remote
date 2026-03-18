@@ -173,7 +173,7 @@ Only update `instructions/telegram_main.md` when:
 
 ### Proactive monitoring tasks
 
-Three scheduled tasks run autonomously via nanoclaw's task scheduler (seeded via `nanoclaw/scripts/seed-monitoring-tasks.ts`):
+Three infrastructure tasks are defined in `api/src/routes/tasks.ts` and **seeded automatically at API startup**. No manual seeding step needed.
 
 | ID | Schedule | Purpose |
 |-|-|-|
@@ -181,9 +181,23 @@ Three scheduled tasks run autonomously via nanoclaw's task scheduler (seeded via
 | `monitoring-morning` | `30 7 * * *` | Morning digest — system status, overnight events, today's tasks |
 | `monitoring-evening` | `0 23 * * *` | Evening wrap-up — shipped work, resolved incidents, tomorrow |
 
-All three run as `context_mode: isolated` against the main Telegram group. State is persisted in `~/nanoclaw-data/groups/telegram_main/monitoring_state.json` — the agent reads/writes it each run to track active issues and a 48h event log.
+All three run as `context_mode: isolated` against the main Telegram group. State is persisted in `~/nanoclaw-data/groups/telegram_main/monitoring_state.json`.
 
-**When to extend these tasks:** if a new integration lands in claude-remote-api that produces time-sensitive signals (e.g. CI failures, deployment events, new alert source), consider whether it belongs in the hourly check's issue detection logic or the morning digest's summary. Update the prompts in `seed-monitoring-tasks.ts` and re-seed (idempotent — existing task IDs are skipped; delete + re-insert to update a prompt).
+**Task API** (managed via claude-remote-api, tag `Tasks` in `/openapi.json`):
+- `GET /tasks` — list all tasks (infra + user-created)
+- `POST /tasks` — Andy can create his own scheduled tasks
+- `PATCH /tasks/:id` — reschedule (set `next_run`) or pause/resume (`status`)
+- `DELETE /tasks/:id` — delete user-created tasks (infra tasks protected)
+
+**Infra tasks are identified by their IDs** (`monitoring-*`) and cannot be deleted. Andy can create user tasks with any schedule.
+
+**To update infra task prompts:** edit `INFRA_TASKS` in `api/src/routes/tasks.ts`, then redeploy the API container. The API reseeds on startup but only inserts tasks that don't yet exist — so to update an existing prompt, delete the row first:
+```bash
+sqlite3 ~/nanoclaw-data/store/messages.db "DELETE FROM scheduled_tasks WHERE id='monitoring-hourly'"
+# then restart the API container to reseed
+```
+
+`nanoclaw/scripts/seed-monitoring-tasks.ts` is **deprecated** — superseded by the API's startup seeding.
 
 ---
 
