@@ -2,12 +2,8 @@ import { Elysia, t } from 'elysia'
 
 const UPTIME_KUMA_URL = process.env.UPTIME_KUMA_URL ?? ''
 const UPTIME_KUMA_API_KEY = process.env.UPTIME_KUMA_API_KEY ?? ''
-const NTFY_BASE_URL = process.env.NTFY_BASE_URL ?? 'https://ntfy.jkrumm.com'
-const NTFY_TOKEN = process.env.NTFY_TOKEN ?? ''
 
-// UptimeKuma v2 exposes Prometheus metrics at /metrics with Basic auth.
-// Username is empty, password is the API key.
-async function fetchUptimeKumaMetrics(): Promise<string> {
+async function fetchMetrics(): Promise<string> {
   const credentials = Buffer.from(`:${UPTIME_KUMA_API_KEY}`).toString('base64')
   const base = UPTIME_KUMA_URL.replace(/\/$/, '')
   const res = await fetch(`${base}/metrics`, {
@@ -17,8 +13,6 @@ async function fetchUptimeKumaMetrics(): Promise<string> {
   return res.text()
 }
 
-// Parse Prometheus text format into a list of monitor objects.
-// Collects monitor_status and monitor_uptime_ratio (1d window) per monitor.
 function parseMonitors(metrics: string): Array<{
   id: string
   name: string
@@ -34,7 +28,6 @@ function parseMonitors(metrics: string): Array<{
   for (const line of metrics.split('\n')) {
     if (line.startsWith('#') || !line.trim()) continue
 
-    // monitor_status{...} value
     const statusMatch = line.match(
       /^monitor_status\{monitor_id="([^"]+)",monitor_name="([^"]+)",monitor_type="([^"]+)",monitor_url="([^"]+)"[^}]*\}\s+([\d.]+)/,
     )
@@ -44,7 +37,6 @@ function parseMonitors(metrics: string): Array<{
       continue
     }
 
-    // monitor_uptime_ratio{...,window="1d"} value
     const uptimeMatch = line.match(
       /^monitor_uptime_ratio\{monitor_id="([^"]+)"[^}]*,window="([^"]+)"\}\s+([\d.]+)/,
     )
@@ -64,28 +56,29 @@ function parseMonitors(metrics: string): Array<{
   }))
 }
 
-export const homelabRoutes = new Elysia({ prefix: '/homelab' })
+export const uptimeKumaRoutes = new Elysia({ prefix: '/uptime-kuma' })
+
   .get(
-    '/uptime-kuma/monitors',
+    '/monitors',
     async () => {
-      const metrics = await fetchUptimeKumaMetrics()
+      const metrics = await fetchMetrics()
       return parseMonitors(metrics)
     },
     {
       response: t.Any({ description: 'All monitors with status and uptime ratios' }),
       detail: {
-        tags: ['Homelab'],
+        tags: ['UptimeKuma'],
         summary: 'Get all UptimeKuma monitors with status and uptime',
         security: [{ BearerAuth: [] }],
       },
     },
   )
+
   .get(
-    '/uptime-kuma/status',
+    '/status',
     async () => {
-      const metrics = await fetchUptimeKumaMetrics()
+      const metrics = await fetchMetrics()
       const monitors = parseMonitors(metrics)
-      // Exclude group-type monitors from counts (they aggregate children)
       const real = monitors.filter((m) => m.type !== 'group')
       return {
         up: real.filter((m) => m.status === 1).length,
@@ -100,55 +93,8 @@ export const homelabRoutes = new Elysia({ prefix: '/homelab' })
         total: t.Number(),
       }),
       detail: {
-        tags: ['Homelab'],
+        tags: ['UptimeKuma'],
         summary: 'Get UptimeKuma monitor summary (up/down counts, groups excluded)',
-        security: [{ BearerAuth: [] }],
-      },
-    },
-  )
-  .get(
-    '/ntfy/topics',
-    async () => {
-      const res = await fetch(`${NTFY_BASE_URL}/v1/account`, {
-        headers: NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {},
-      })
-      if (!res.ok) throw new Error(`ntfy ${res.status}: ${await res.text()}`)
-      const account = (await res.json()) as {
-        subscriptions?: Array<{ topic: string; display_name?: string | null }>
-      }
-      return (account.subscriptions ?? []).map((s) => s.topic)
-    },
-    {
-      response: t.Any({ description: 'Array of subscribed ntfy topic names' }),
-      detail: {
-        tags: ['Homelab'],
-        summary: 'List all subscribed ntfy topics for this account',
-        security: [{ BearerAuth: [] }],
-      },
-    },
-  )
-  .get(
-    '/ntfy/messages',
-    async ({ query }) => {
-      const topic = query.topic
-      const res = await fetch(`${NTFY_BASE_URL}/${topic}/json?poll=1`, {
-        headers: NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {},
-      })
-      if (!res.ok) throw new Error(`ntfy ${res.status}: ${await res.text()}`)
-      // ntfy returns newline-delimited JSON — parse each line
-      const text = await res.text()
-      const messages = text
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => JSON.parse(line))
-      return messages
-    },
-    {
-      query: t.Object({ topic: t.String() }),
-      response: t.Any({ description: 'Array of ntfy messages from the topic' }),
-      detail: {
-        tags: ['Homelab'],
-        summary: 'Fetch recent messages from an ntfy topic (poll, no streaming)',
         security: [{ BearerAuth: [] }],
       },
     },

@@ -4,9 +4,9 @@ import { swagger } from "@elysiajs/swagger";
 import { initTickTickClient } from "./clients/ticktick.js";
 import { healthRoute } from "./routes/health.js";
 import { ticktickAuthRoutes } from "./routes/ticktick-auth.js";
-import { notifyRoute } from "./routes/notify.js";
 import { ticktickRoutes } from "./routes/ticktick.js";
-import { homelabRoutes } from "./routes/homelab.js";
+import { ntfyRoutes } from "./routes/ntfy.js";
+import { uptimeKumaRoutes } from "./routes/uptime-kuma.js";
 import { githubRoutes } from "./routes/github.js";
 import { dockerRoutes } from "./routes/docker.js";
 import { registerCronJobs } from "./cron/index.js";
@@ -34,7 +34,7 @@ new Elysia()
           title: "claude-remote-api",
           version: "0.1.0",
           description:
-            "Personal backend proxy for TickTick, NTFY, homelab monitoring (UptimeKuma, ntfy), GitHub API, and Docker container monitoring. All endpoints except /health and /ticktick/auth/* require Bearer token authentication.",
+            "Personal backend proxy for TickTick, ntfy, UptimeKuma, GitHub, and Docker container monitoring. All endpoints except /health and /ticktick/auth/* require Bearer token authentication.",
         },
         servers: [{ url: "https://claude-remote-api.jkrumm.com", description: "Production" }],
         components: {
@@ -48,9 +48,9 @@ new Elysia()
   .use(healthRoute)
   .use(ticktickAuthRoutes)
   .use(authGuard)
-  .use(notifyRoute)
   .use(ticktickRoutes)
-  .use(homelabRoutes)
+  .use(ntfyRoutes)
+  .use(uptimeKumaRoutes)
   .use(githubRoutes)
   .use(dockerRoutes)
   .listen(4000);
