@@ -19,6 +19,16 @@ const telegramifyMarkdown = require('telegramify-markdown') as (
   unsupportedTagsStrategy?: 'escape' | 'remove' | 'keep',
 ) => string;
 
+// Strip inline markdown formatting from plain text (used inside table cells).
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // bold
+    .replace(/\*(.+?)\*/g, '$1')       // italic
+    .replace(/__(.+?)__/g, '$1')       // bold underscore
+    .replace(/_(.+?)_/g, '$1')         // italic underscore
+    .replace(/`(.+?)`/g, '$1');        // inline code
+}
+
 // Telegram doesn't render Markdown tables — convert them to fixed-width
 // monospace code blocks so they stay aligned.
 function preprocessTables(text: string): string {
@@ -38,7 +48,7 @@ function preprocessTables(text: string): string {
         .replace(/^\s*\|/, '')
         .replace(/\|\s*$/, '')
         .split('|')
-        .map((c) => c.trim()),
+        .map((c) => stripInlineMarkdown(c.trim())),
     );
     if (rows.length === 0) {
       out.push(...tableLines);
@@ -68,6 +78,18 @@ function preprocessTables(text: string): string {
   return out.join('\n');
 }
 
+// Replace ISO dates (YYYY-MM-DD) with German short format (DD.MM.YY).
+function formatDates(text: string): string {
+  return text.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) =>
+    `${d}.${m}.${y.slice(2)}`,
+  );
+}
+
+// Replace markdown horizontal rules (--- or ***) with a unicode separator line.
+function formatHorizontalRules(text: string): string {
+  return text.replace(/^[ \t]*[-*]{3,}[ \t]*$/gm, '──────────────────────');
+}
+
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -86,7 +108,8 @@ async function sendTelegramMessage(
   options: { message_thread_id?: number } = {},
 ): Promise<void> {
   try {
-    const converted = telegramifyMarkdown(preprocessTables(text), 'escape');
+    const preprocessed = formatHorizontalRules(formatDates(preprocessTables(text)));
+    const converted = telegramifyMarkdown(preprocessed, 'escape');
     await api.sendMessage(chatId, converted, {
       ...options,
       parse_mode: 'MarkdownV2',
