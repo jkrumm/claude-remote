@@ -171,6 +171,20 @@ Only update `instructions/telegram_main.md` when:
 
 **When adding new integrations to claude-remote-api**, consider whether key context (e.g. counts, alerts, recent items) should also be included in the `/summary` response in `api/src/routes/summary.ts`. The summary is the agent's primary situational awareness snapshot — it should reflect the most diagnostically useful slice of each integrated service.
 
+### Proactive monitoring tasks
+
+Three scheduled tasks run autonomously via nanoclaw's task scheduler (seeded via `nanoclaw/scripts/seed-monitoring-tasks.ts`):
+
+| ID | Schedule | Purpose |
+|-|-|-|
+| `monitoring-hourly` | `0 * * * *` | Silent health check — state-transition alerts via NTFY only |
+| `monitoring-morning` | `30 7 * * *` | Morning digest — system status, overnight events, today's tasks |
+| `monitoring-evening` | `0 23 * * *` | Evening wrap-up — shipped work, resolved incidents, tomorrow |
+
+All three run as `context_mode: isolated` against the main Telegram group. State is persisted in `~/nanoclaw-data/groups/telegram_main/monitoring_state.json` — the agent reads/writes it each run to track active issues and a 48h event log.
+
+**When to extend these tasks:** if a new integration lands in claude-remote-api that produces time-sensitive signals (e.g. CI failures, deployment events, new alert source), consider whether it belongs in the hourly check's issue detection logic or the morning digest's summary. Update the prompts in `seed-monitoring-tasks.ts` and re-seed (idempotent — existing task IDs are skipped; delete + re-insert to update a prompt).
+
 ---
 
 ## Shell aliases
