@@ -40,7 +40,7 @@ Always explore `/openapi.json` first. Endpoint paths, available fields, and para
 
 ## TickTick — Task Management
 
-All dates from the API are `YYYY-MM-DD` strings (normalized to Europe/Berlin timezone). Never assume project IDs — always discover them fresh via `GET /ticktick/projects`.
+All dates are plain `YYYY-MM-DD` strings — both when reading from the API and when creating or updating tasks. Never pass timestamps or ISO strings with time components. Never assume project IDs — always discover them fresh via `GET /ticktick/projects`.
 
 **Workflow:**
 1. `GET /ticktick/projects` → get project list with names and IDs

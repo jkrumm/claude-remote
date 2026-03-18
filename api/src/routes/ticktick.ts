@@ -1,7 +1,9 @@
 import { Elysia, t } from 'elysia'
 import { ticktickOps } from '../clients/ticktick'
 
-const TZ = 'Europe/Berlin'
+// TickTick account timezone — used to convert YYYY-MM-DD to the correct midnight UTC timestamp.
+// Must match the timezone configured in the TickTick account settings.
+const TZ = process.env.TICKTICK_TIMEZONE ?? 'Europe/Madrid'
 
 // ─── Inbound: accept YYYY-MM-DD, convert to TickTick's UTC-midnight ISO format ─
 
@@ -19,17 +21,16 @@ function toTickTickISO(yyyymmdd: string, tz: string): string {
 }
 
 // Accept YYYY-MM-DD from clients and convert to TickTick ISO midnight + set isAllDay + startDate.
-// This keeps all timezone logic on the server so any client just sends a plain date string.
+// Only YYYY-MM-DD is accepted — full ISO strings are rejected to prevent double timezone conversion.
 function normalizeDueDate(body: Record<string, unknown>): Record<string, unknown> {
   const { dueDate } = body
   if (!dueDate || typeof dueDate !== 'string') return body
-  const tz = typeof body.timeZone === 'string' ? body.timeZone : TZ
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-    const iso = toTickTickISO(dueDate, tz)
-    return { ...body, dueDate: iso, startDate: iso, isAllDay: true }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    throw new Error(`dueDate must be YYYY-MM-DD, got: ${dueDate}`)
   }
-  // Full ISO string passed through — still ensure startDate and isAllDay are set
-  return { ...body, startDate: body.startDate ?? dueDate, isAllDay: true }
+  const tz = typeof body.timeZone === 'string' ? body.timeZone : TZ
+  const iso = toTickTickISO(dueDate, tz)
+  return { ...body, dueDate: iso, startDate: iso, isAllDay: true }
 }
 
 // ─── Outbound: convert TickTick's UTC-midnight ISO back to plain YYYY-MM-DD ──
@@ -94,7 +95,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
       {
         title: t.String(),
         projectId: t.Optional(t.String()),
-        dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD or full ISO string. Server converts to ISO midnight UTC.' })),
+        dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD only. Server converts to the correct midnight timestamp for the TickTick account timezone.' })),
         priority: t.Optional(t.Number({ description: '0=none, 1=low, 3=medium, 5=high' })),
         content: t.Optional(t.String()),
         startDate: t.Optional(t.String()),
@@ -123,7 +124,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
         {
           title: t.Optional(t.String()),
           projectId: t.Optional(t.String()),
-          dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD or full ISO string' })),
+          dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD only' })),
           priority: t.Optional(t.Number({ description: '0=none, 1=low, 3=medium, 5=high' })),
           content: t.Optional(t.String()),
           status: t.Optional(t.Number({ description: '0=active, 2=completed' })),
