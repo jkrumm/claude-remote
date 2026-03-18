@@ -9,6 +9,7 @@
  */
 
 import Database from 'better-sqlite3';
+import { parseExpression } from 'cron-parser';
 import path from 'path';
 
 const DB_PATH =
@@ -131,6 +132,10 @@ Rules:
 
 // ─── Seed helper ──────────────────────────────────────────────────────────────
 
+function nextCronRun(cron: string): string {
+  return parseExpression(cron).next().toISOString();
+}
+
 function seedTask(
   id: string,
   prompt: string,
@@ -145,13 +150,15 @@ function seedTask(
     return;
   }
 
+  const nextRun = nextCronRun(cron);
+
   db.prepare(
     `INSERT INTO scheduled_tasks
       (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, context_mode, next_run, status, created_at)
-     VALUES (?, ?, ?, ?, 'cron', ?, 'isolated', datetime('now'), 'active', ?)`,
-  ).run(id, GROUP_FOLDER, CHAT_JID, prompt, cron, NOW);
+     VALUES (?, ?, ?, ?, 'cron', ?, 'isolated', ?, 'active', ?)`,
+  ).run(id, GROUP_FOLDER, CHAT_JID, prompt, cron, nextRun, NOW);
 
-  console.log(`  seeded ${id} — ${label} (${cron})`);
+  console.log(`  seeded ${id} — ${label} (${cron}) → next run ${nextRun}`);
 }
 
 seedTask('monitoring-hourly', HOURLY_PROMPT, '0 * * * *', 'hourly health check');
