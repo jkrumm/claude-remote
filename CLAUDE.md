@@ -68,30 +68,73 @@ Secrets are scoped to the `claude-remote` project in Doppler.
 
 ---
 
-## Nanoclaw Agent Context
+## Nanoclaw — Agent Architecture & Strategy
 
-Nanoclaw runs Claude agents in Docker containers. Each group gets its own container with isolated filesystem. Agent context is controlled via layered CLAUDE.md files:
+### How agent context actually works
 
-| File | Scope | What it controls |
+Nanoclaw spawns a fresh Docker container per message. Context is loaded from scratch on every spawn.
+
+**What each group type receives:**
+
+| | Main group (`telegram_main`) | Non-main groups |
 |-|-|-|
-| `nanoclaw/groups/global/CLAUDE.md` | All groups | Identity, API access, formatting rules |
-| `nanoclaw/groups/main/CLAUDE.md` | Main/admin group | Group management, container mounts, elevated ops |
-| `nanoclaw/groups/telegram_main/CLAUDE.md` | Telegram main channel | Channel-specific formatting, session boot, infrastructure reporting |
+| CWD | `/workspace/group` → `telegram_main/CLAUDE.md` auto-loaded | `/workspace/group` → their own `CLAUDE.md` |
+| `global/CLAUDE.md` | **NOT used** | Injected as system prompt append |
+| `/workspace/global` | Not mounted | Mounted read-only |
+| `/workspace/project` | nanoclaw project root (read-only) | Not mounted |
 
-**Runtime location:** `~/nanoclaw-data/groups/{group}/CLAUDE.md` (Docker bind mount: `/data/groups/`)
+**`main/CLAUDE.md` is never loaded by the agent.** It is an upstream nanoclaw template artifact — its path is accessible inside the container at `/workspace/project/groups/main/CLAUDE.md` but is not in CWD or `additionalDirectories`, so the SDK never picks it up. It can be ignored.
 
-**Key facts:**
-- The Dockerfile does NOT bake group CLAUDE.md files into the image — they are runtime state on the bind mount
-- `groups/` is gitignored except for CLAUDE.md files (see `.gitignore` negation pattern)
-- When updating a CLAUDE.md: edit the repo file, commit/push, then also apply to the live server file at `~/nanoclaw-data/groups/{group}/CLAUDE.md`
-- `global/CLAUDE.md` is mounted read-only into every agent container at `/workspace/global/`
-- The `telegram_main` group CLAUDE.md layers on top of `main/CLAUDE.md` (main admin template)
+**`telegram_main/CLAUDE.md` is the main agent's entire brain.** It must be fully self-contained — identity, purpose, all behavioral principles.
 
-**To sync repo changes to the server:**
+### VCS vs runtime state
+
+```
+nanoclaw/groups/{folder}/CLAUDE.md     ← VCS: static instructions we control
+~/nanoclaw-data/groups/{folder}/       ← runtime: agent memory (conversations/, notes, etc.)
+```
+
+CLAUDE.md files are instructions. Everything else the agent creates in its workspace is dynamic memory. Only CLAUDE.md is committed.
+
+Tracked in VCS:
+- `nanoclaw/groups/telegram_main/CLAUDE.md` — the main agent's complete context (self-contained)
+- `nanoclaw/groups/global/CLAUDE.md` — base context for any future non-main groups
+- `nanoclaw/groups/main/CLAUDE.md` — upstream template reference only (not loaded by agent)
+
+**To sync a CLAUDE.md change to the live server (no restart needed):**
 ```bash
+ssh cr "cat > ~/nanoclaw-data/groups/telegram_main/CLAUDE.md" < nanoclaw/groups/telegram_main/CLAUDE.md
 ssh cr "cat > ~/nanoclaw-data/groups/global/CLAUDE.md" < nanoclaw/groups/global/CLAUDE.md
 ```
-No restart needed — CLAUDE.md is read fresh on each container spawn.
+
+### The monitoring philosophy
+
+The agent's primary purpose is HomeLab + VPS monitoring via Telegram. The core design principle:
+
+**Teach behavior, not setup.**
+
+The infrastructure changes constantly — container names, services, endpoint paths all go stale. Hardcoding them into the agent's context makes it confidently wrong. Instead, the CLAUDE.md teaches *how* to discover and investigate.
+
+| ✅ Teach | ❌ Don't hardcode |
+|-|-|
+| "Discover endpoints via `/openapi.json` every session" | Specific endpoint paths |
+| "Check restart counts, memory trends, log content" | Expected container names |
+| "Cover both homelab and VPS" | Which services should be running |
+| "Cross-reference UptimeKuma with Docker state" | Normal baseline metrics |
+| "Lead with verdict, then evidence" | VPS/homelab topology |
+
+**Discovery over assumption:** Query current state rather than relying on memory. The agent fetches `/openapi.json` to know what tools exist right now, then queries live infrastructure.
+
+**Investigation depth:** Surface health is not enough. The CLAUDE.md teaches the agent to probe restart counts, memory trends, log content, and source disagreements — not just whether containers are running.
+
+### Adding capabilities
+
+When new routes are added to claude-remote-api, no agent config changes are needed. The agent discovers new endpoints via `/openapi.json` automatically.
+
+Only update `telegram_main/CLAUDE.md` when:
+- A new capability domain is added that needs conceptual framing (e.g. "you now have access to GitHub Actions")
+- A behavioral pattern needs adjustment
+- Formatting or communication rules change
 
 ---
 
