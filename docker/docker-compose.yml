@@ -129,6 +129,11 @@ services:
       - CLAUDE_CREDENTIALS_FILE=/run/secrets/claude-credentials
       # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
       - HOST_DATA_DIR=/home/claude-remote/nanoclaw-data
+      # Agent container timeouts: keep below Docker proxy TCP idle (~10min) to avoid orphans.
+      - CONTAINER_TIMEOUT=480000
+      - IDLE_TIMEOUT=480000
+      # Model used by agent containers. Override to claude-sonnet-4-6 for complex tasks.
+      - NANOCLAW_MODEL=claude-haiku-4-5-20251001
     depends_on:
       claude-remote-api:
         condition: service_healthy

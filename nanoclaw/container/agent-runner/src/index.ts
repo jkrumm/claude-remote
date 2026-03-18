@@ -392,6 +392,7 @@ async function runQuery(
   for await (const message of query({
     prompt: stream,
     options: {
+      model: process.env.NANOCLAW_MODEL || 'claude-haiku-4-5-20251001',
       cwd: '/workspace/group',
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
@@ -506,12 +507,16 @@ async function main(): Promise<void> {
   }
 
   // Query loop: run query → wait for IPC message → run new query → repeat
+  // Reset session after SESSION_MAX_QUERIES to prevent unbounded context growth.
+  const SESSION_MAX_QUERIES = parseInt(process.env.SESSION_MAX_QUERIES || '20', 10);
+  let queryCount = 0;
   let resumeAt: string | undefined;
   try {
     while (true) {
-      log(`Starting query (session: ${sessionId || 'new'}, resumeAt: ${resumeAt || 'latest'})...`);
+      log(`Starting query (session: ${sessionId || 'new'}, resumeAt: ${resumeAt || 'latest'}, queryCount: ${queryCount})...`);
 
       const queryResult = await runQuery(prompt, sessionId, mcpServerPath, containerInput, sdkEnv, resumeAt);
+      queryCount++;
       if (queryResult.newSessionId) {
         sessionId = queryResult.newSessionId;
       }
@@ -525,6 +530,16 @@ async function main(): Promise<void> {
       if (queryResult.closedDuringQuery) {
         log('Close sentinel consumed during query, exiting');
         break;
+      }
+
+      // Reset session after SESSION_MAX_QUERIES to prevent unbounded context growth.
+      // The PreCompact hook archives the conversation before any compaction, so history
+      // is preserved in conversations/ for the CLAUDE.md boot instruction to re-read.
+      if (queryCount >= SESSION_MAX_QUERIES) {
+        log(`Session reset after ${queryCount} queries (SESSION_MAX_QUERIES=${SESSION_MAX_QUERIES})`);
+        sessionId = undefined;
+        resumeAt = undefined;
+        queryCount = 0;
       }
 
       // Emit session update so host can track it

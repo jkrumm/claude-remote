@@ -246,6 +246,14 @@ function buildContainerArgs(
   args.push('-e', `CLAUDE_REMOTE_API_URL=${apiUrl}`);
   args.push('-e', `CLAUDE_REMOTE_API_SECRET=${apiSecret}`);
 
+  // Forward model and session config from nanoclaw env to agent containers
+  if (process.env.NANOCLAW_MODEL) {
+    args.push('-e', `NANOCLAW_MODEL=${process.env.NANOCLAW_MODEL}`);
+  }
+  if (process.env.SESSION_MAX_QUERIES) {
+    args.push('-e', `SESSION_MAX_QUERIES=${process.env.SESSION_MAX_QUERIES}`);
+  }
+
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());
 
@@ -561,6 +569,10 @@ export async function runContainerAgent(
           },
           'Container exited with error',
         );
+
+        // Docker client died (e.g. proxy TCP drop) but the container may still
+        // be running. Stop it so we don't accumulate orphaned containers.
+        exec(stopContainer(containerName), { timeout: 10000 }, () => {});
 
         resolve({
           status: 'error',
