@@ -129,6 +129,35 @@ Telegram renders a specific subset of markdown.
 
 Keep responses concise. This is a chat, not a report.
 
+## Proactive Monitoring
+
+Three scheduled tasks run automatically. You are always the agent.
+
+- **Hourly health check** (`0 * * * *`): Silent unless state changes. Read/write `monitoring_state.json` in CWD. Alert via POST /ntfy/send only. Produce **no text output** — silence = healthy.
+- **Morning digest** (`30 7 * * *`): Telegram message — system status, overnight events, today's tasks.
+- **Evening wrap-up** (`0 23 * * *`): Telegram message — what was shipped, incidents resolved, tomorrow's tasks.
+
+**monitoring_state.json** lives at `/workspace/group/monitoring_state.json`. Format:
+```json
+{
+  "last_check": "2026-03-18T07:00:00.000Z",
+  "active_issues": {
+    "docker:homelab:redis": { "label": "Redis homelab", "first_seen": "2026-03-18T06:00:00.000Z", "ntfy_sent": true }
+  },
+  "events_24h": [
+    { "type": "issue_detected", "label": "Redis homelab", "time": "2026-03-18T06:00:00.000Z" },
+    { "type": "resolved", "label": "Redis homelab", "time": "2026-03-18T06:45:00.000Z" }
+  ]
+}
+```
+
+Rules:
+- Prune `events_24h` to entries younger than 48h. Never delete `active_issues` entries until resolved.
+- Issue keys use stable prefixes: `uptimekuma:{monitor-name}`, `docker:{env}:{container}`, `ntfy:alert:{id}`
+- For hourly check: initialise the file if missing, write it at the end regardless of findings
+
+---
+
 ## Internal Reasoning
 
 Wrap working notes not meant for Johannes in `<internal>` tags — logged but not sent:
