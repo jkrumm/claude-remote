@@ -94,6 +94,17 @@ function buildVolumeMounts(
       containerPath: '/workspace/group',
       readonly: false,
     });
+
+    // Main group: VCS-controlled behavioral instructions injected as system prompt.
+    // Stored separately from the r/w group folder so the agent cannot overwrite them.
+    const instructionsDir = path.join(GROUPS_DIR, 'instructions');
+    if (fs.existsSync(instructionsDir)) {
+      mounts.push({
+        hostPath: toHostMountPath(instructionsDir),
+        containerPath: '/workspace/instructions',
+        readonly: true,
+      });
+    }
   } else {
     // Other groups only get their own folder
     mounts.push({

@@ -366,11 +366,20 @@ async function runQuery(
   let messageCount = 0;
   let resultCount = 0;
 
-  // Load global CLAUDE.md as additional system context (shared across all groups)
-  const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
-  let globalClaudeMd: string | undefined;
-  if (!containerInput.isMain && fs.existsSync(globalClaudeMdPath)) {
-    globalClaudeMd = fs.readFileSync(globalClaudeMdPath, 'utf-8');
+  // Load VCS-controlled behavioral instructions and inject as system prompt.
+  // Main group: /workspace/instructions/{groupFolder}.md (read-only mount, never writable by agent)
+  // Non-main groups: /workspace/global/CLAUDE.md (existing mechanism)
+  let systemInstructions: string | undefined;
+  if (containerInput.isMain) {
+    const instructionsPath = `/workspace/instructions/${containerInput.groupFolder}.md`;
+    if (fs.existsSync(instructionsPath)) {
+      systemInstructions = fs.readFileSync(instructionsPath, 'utf-8');
+    }
+  } else {
+    const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
+    if (fs.existsSync(globalClaudeMdPath)) {
+      systemInstructions = fs.readFileSync(globalClaudeMdPath, 'utf-8');
+    }
   }
 
   // Discover additional directories mounted at /workspace/extra/*
@@ -397,8 +406,8 @@ async function runQuery(
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
       resumeSessionAt: resumeAt,
-      systemPrompt: globalClaudeMd
-        ? { type: 'preset' as const, preset: 'claude_code' as const, append: globalClaudeMd }
+      systemPrompt: systemInstructions
+        ? { type: 'preset' as const, preset: 'claude_code' as const, append: systemInstructions }
         : undefined,
       allowedTools: [
         'Bash',
