@@ -70,71 +70,100 @@ Secrets are scoped to the `claude-remote` project in Doppler.
 
 ## Nanoclaw — Agent Architecture & Strategy
 
-### How agent context actually works
+### How agent context works
 
-Nanoclaw spawns a fresh Docker container per message. Context is loaded from scratch on every spawn.
+Nanoclaw spawns a fresh Docker container per message. Context loads from scratch on every spawn — there is no persistent in-memory state.
 
-**What each group type receives:**
+**Context each group type receives:**
 
 | | Main group (`telegram_main`) | Non-main groups |
 |-|-|-|
-| CWD | `/workspace/group` → `telegram_main/CLAUDE.md` auto-loaded | `/workspace/group` → their own `CLAUDE.md` |
-| `global/CLAUDE.md` | **NOT used** | Injected as system prompt append |
+| Behavioral instructions | `groups/instructions/{folder}.md` injected as **system prompt append** (read-only mount) | `groups/global/CLAUDE.md` injected as **system prompt append** (read-only mount) |
+| Agent memory CWD | `/workspace/group` → `~/nanoclaw-data/groups/{folder}/` (read-write, no CLAUDE.md) | Same |
+| `/workspace/instructions` | Mounted read-only from `~/nanoclaw-data/groups/instructions/` | Not mounted |
 | `/workspace/global` | Not mounted | Mounted read-only |
 | `/workspace/project` | nanoclaw project root (read-only) | Not mounted |
 
-**`main/CLAUDE.md` is never loaded by the agent.** It is an upstream nanoclaw template artifact — its path is accessible inside the container at `/workspace/project/groups/main/CLAUDE.md` but is not in CWD or `additionalDirectories`, so the SDK never picks it up. It can be ignored.
+**Key facts:**
+- `main/CLAUDE.md` is never loaded — upstream nanoclaw template artifact, not in CWD or `additionalDirectories`
+- The agent's CWD (`/workspace/group`) contains only dynamic memory files — no CLAUDE.md lives there
+- Instructions are injected via `systemPrompt: { type: 'preset', preset: 'claude_code', append: content }` — the agent cannot read or write the source file
 
-**`telegram_main/CLAUDE.md` is the main agent's entire brain.** It must be fully self-contained — identity, purpose, all behavioral principles.
+### Why systemPrompt.append, not CWD CLAUDE.md
 
-### VCS vs runtime state
+NanoClaw upstream intends behavioral instructions to live as CLAUDE.md in the group's CWD folder, seeded from templates on registration. We diverge for two reasons:
+
+1. **Architectural guarantee:** The agent's CWD is read-write. Putting instructions there means the agent can technically overwrite them. Injecting via system prompt makes them immutable — not in any filesystem the agent can reach.
+
+2. **Upstream has a bug:** GitHub issue #755 documents that the register step doesn't actually copy CLAUDE.md into new group folders, leaving agents with no instructions. Our approach doesn't depend on a file being copied correctly.
+
+The Claude Agent SDK officially documents `systemPrompt.append` as one of four supported methods (alongside CLAUDE.md, output styles, and custom prompts). It's described as "session only" in the docs, but in nanoclaw's per-container architecture every message is a fresh session — so "loaded every time" is exactly what we want.
+
+Non-main groups already used this mechanism (`global/CLAUDE.md` → system prompt append). We extended it consistently to the main group.
+
+### VCS vs runtime — the clean split
 
 ```
-nanoclaw/groups/{folder}/CLAUDE.md     ← VCS: static instructions we control
-~/nanoclaw-data/groups/{folder}/       ← runtime: agent memory (conversations/, notes, etc.)
+nanoclaw/groups/instructions/{folder}.md  ← VCS only: behavioral instructions (never in agent's filesystem)
+nanoclaw/groups/global/CLAUDE.md          ← VCS only: base context for non-main groups
+~/nanoclaw-data/groups/{folder}/          ← runtime only: agent memory (conversations/, notes, etc.)
+~/nanoclaw-data/groups/instructions/      ← runtime only: synced from VCS, mounted read-only
 ```
 
-CLAUDE.md files are instructions. Everything else the agent creates in its workspace is dynamic memory. Only CLAUDE.md is committed.
+Tracked in VCS (`nanoclaw/groups/`):
+- `instructions/telegram_main.md` — main agent's complete behavioral instructions
+- `global/CLAUDE.md` — base identity + API discovery for future non-main groups
+- `main/CLAUDE.md` — upstream template reference (not loaded, kept for reference)
+- `telegram_main/CLAUDE.md` — **does not exist**, group folder is pure memory space
 
-Tracked in VCS:
-- `nanoclaw/groups/telegram_main/CLAUDE.md` — the main agent's complete context (self-contained)
-- `nanoclaw/groups/global/CLAUDE.md` — base context for any future non-main groups
-- `nanoclaw/groups/main/CLAUDE.md` — upstream template reference only (not loaded by agent)
-
-**To sync a CLAUDE.md change to the live server (no restart needed):**
+**To update agent instructions and sync to the live server:**
 ```bash
-ssh cr "cat > ~/nanoclaw-data/groups/telegram_main/CLAUDE.md" < nanoclaw/groups/telegram_main/CLAUDE.md
-ssh cr "cat > ~/nanoclaw-data/groups/global/CLAUDE.md" < nanoclaw/groups/global/CLAUDE.md
+# 1. Edit the instructions file
+vi nanoclaw/groups/instructions/telegram_main.md
+
+# 2. Commit and push
+git add nanoclaw/groups/instructions/telegram_main.md
+git commit -m "docs(nanoclaw): ..."
+git push
+
+# 3. Pull on server and sync (no nanoclaw restart needed — read fresh per container spawn)
+ssh cr "cd ~/SourceRoot/claude-remote && git pull && cp nanoclaw/groups/instructions/telegram_main.md ~/nanoclaw-data/groups/instructions/telegram_main.md"
+```
+
+**After changing agent-runner or container-runner source code**, the agent container image must be rebuilt:
+```bash
+ssh cr "cd ~/SourceRoot/claude-remote/nanoclaw && git pull && ./container/build.sh"
 ```
 
 ### The monitoring philosophy
 
-The agent's primary purpose is HomeLab + VPS monitoring via Telegram. The core design principle:
+The agent's primary purpose is HomeLab + VPS monitoring via Telegram. The core principle:
 
 **Teach behavior, not setup.**
 
-The infrastructure changes constantly — container names, services, endpoint paths all go stale. Hardcoding them into the agent's context makes it confidently wrong. Instead, the CLAUDE.md teaches *how* to discover and investigate.
+Infrastructure changes constantly — containers get added, services move, APIs evolve. Hardcoding specifics makes the agent confidently wrong. Teach *how* to discover and investigate instead.
 
-| ✅ Teach | ❌ Don't hardcode |
+| ✅ Teach (in `instructions/telegram_main.md`) | ❌ Never hardcode |
 |-|-|
-| "Discover endpoints via `/openapi.json` every session" | Specific endpoint paths |
-| "Check restart counts, memory trends, log content" | Expected container names |
-| "Cover both homelab and VPS" | Which services should be running |
-| "Cross-reference UptimeKuma with Docker state" | Normal baseline metrics |
-| "Lead with verdict, then evidence" | VPS/homelab topology |
+| Fetch `/openapi.json` fresh every session | Specific endpoint paths or schemas |
+| Check restart counts, memory trends, log content | Expected container names or counts |
+| Cover both homelab and VPS | Which services should be running |
+| Cross-reference UptimeKuma vs Docker state | Normal baseline metrics |
+| Lead with verdict, then evidence | VPS/homelab network topology |
+| Send NTFY for urgent findings | Alert thresholds |
 
-**Discovery over assumption:** Query current state rather than relying on memory. The agent fetches `/openapi.json` to know what tools exist right now, then queries live infrastructure.
+**Discovery over assumption:** The agent fetches `/openapi.json` to know what tools it has right now, then queries live state. Prior knowledge of the infrastructure is always treated as potentially stale.
 
-**Investigation depth:** Surface health is not enough. The CLAUDE.md teaches the agent to probe restart counts, memory trends, log content, and source disagreements — not just whether containers are running.
+**Investigation depth:** Surface health is not enough. A container with 50 restarts that's currently up is broken. The instructions teach the agent to probe deeper — logs, memory trends, timing, cross-source disagreements.
 
-### Adding capabilities
+### Adding capabilities to the agent
 
-When new routes are added to claude-remote-api, no agent config changes are needed. The agent discovers new endpoints via `/openapi.json` automatically.
+When new routes are added to claude-remote-api: **no instruction changes needed.** The agent discovers new endpoints via `/openapi.json` automatically.
 
-Only update `telegram_main/CLAUDE.md` when:
-- A new capability domain is added that needs conceptual framing (e.g. "you now have access to GitHub Actions")
-- A behavioral pattern needs adjustment
-- Formatting or communication rules change
+Only update `instructions/telegram_main.md` when:
+- A new capability domain is added that needs conceptual framing (e.g. "you now have access to GitHub Actions status")
+- A behavioral pattern needs adjustment (e.g. changing how health reports are structured)
+- Communication/formatting rules change
 
 ---
 
