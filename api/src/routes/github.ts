@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia'
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? ''
+const GITHUB_TOKEN_CLASSIC = process.env.GITHUB_TOKEN_CLASSIC ?? ''
 const GITHUB_API = 'https://api.github.com'
 
 const detail = (summary: string, description: string) => ({
@@ -10,10 +11,10 @@ const detail = (summary: string, description: string) => ({
   security: [{ BearerAuth: [] }],
 })
 
-async function proxyToGitHub(request: Request, path: string): Promise<Response> {
+async function proxyToGitHub(request: Request, path: string, token = GITHUB_TOKEN): Promise<Response> {
   const targetUrl = `${GITHUB_API}/${path}`
   const headers = new Headers(request.headers)
-  headers.set('Authorization', `Bearer ${GITHUB_TOKEN}`)
+  headers.set('Authorization', `Bearer ${token}`)
   headers.set('Accept', headers.get('Accept') ?? 'application/vnd.github+json')
   headers.set('X-GitHub-Api-Version', '2022-11-28')
   headers.delete('host')
@@ -279,6 +280,27 @@ export const githubRoutes = new Elysia({ prefix: '/github' })
         page: t.Optional(t.String()),
       }),
       detail: detail('Search repositories', 'Returns total_count and items array. Each item has full_name, description, stargazers_count, language, and html_url.'),
+    },
+  )
+
+  // --- Notifications (requires classic PAT — fine-grained PATs don't support this scope) ---
+  .get(
+    '/api/notifications',
+    async ({ request, query }) =>
+      proxyToGitHub(request, `notifications${buildQuery(query)}`, GITHUB_TOKEN_CLASSIC),
+    {
+      query: t.Object({
+        all: t.Optional(t.String({ description: 'true = include already-read notifications' })),
+        participating: t.Optional(t.String({ description: 'true = only notifications where you are directly participating' })),
+        since: t.Optional(t.String({ description: 'ISO 8601 date — only notifications updated after this time' })),
+        before: t.Optional(t.String({ description: 'ISO 8601 date — only notifications updated before this time' })),
+        per_page: t.Optional(t.String()),
+        page: t.Optional(t.String()),
+      }),
+      detail: detail(
+        'List notifications',
+        'Returns notifications for the authenticated user using the classic PAT (fine-grained PATs do not support the notifications scope). Each item has id, reason, unread, subject.title, subject.type, repository.full_name, and updated_at.',
+      ),
     },
   )
 
