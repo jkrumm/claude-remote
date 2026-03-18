@@ -73,6 +73,8 @@ services:
       - DOCKER_PROXY_URL_HOMELAB=http://docker-proxy:2375
       - DOCKER_PROXY_URL_VPS=${DOCKER_PROXY_URL_VPS}
       - NANOCLAW_DB_PATH=/nanoclaw-data/store/messages.db
+      - VIBEKANBAN_BASE_URL=http://vibekanban:8081
+      - VIBEKANBAN_REFRESH_TOKEN=${VIBEKANBAN_REFRESH_TOKEN}
     volumes:
       - api-data:/data
       - /home/claude-remote/nanoclaw-data:/nanoclaw-data:rw
@@ -129,7 +131,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
-      - VIBEKANBAN_BASE_URL=http://vibekanban:3000
+      - VIBEKANBAN_BASE_URL=http://vibekanban:8081
       - DOCKER_HOST=tcp://docker-proxy:2375
       - CLAUDE_CREDENTIALS_FILE=/run/secrets/claude-credentials
       # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
