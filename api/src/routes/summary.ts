@@ -1,4 +1,6 @@
+import { Database } from 'bun:sqlite'
 import { Elysia, t } from 'elysia'
+import path from 'path'
 import { fetchMonitors } from '../clients/uptime-kuma.js'
 import { ticktickOps } from '../clients/ticktick.js'
 import type { Project, Task } from '../generated/ticktick/types.gen.js'
@@ -229,6 +231,28 @@ async function fetchGitHubSummary() {
   }
 }
 
+function fetchTasksSummary() {
+  const dbPath =
+    process.env.NANOCLAW_DB_PATH ??
+    path.join(process.env.HOME!, 'nanoclaw-data/store/messages.db')
+  const INFRA_IDS = new Set(['monitoring-hourly', 'monitoring-morning', 'monitoring-evening'])
+  const db = new Database(dbPath, { readonly: true })
+  try {
+    const rows = db
+      .query<
+        { id: string; schedule_value: string; status: string; next_run: string | null; last_run: string | null },
+        []
+      >(
+        `SELECT id, schedule_value, status, next_run, last_run
+         FROM scheduled_tasks WHERE status != 'completed' ORDER BY created_at`,
+      )
+      .all()
+    return rows.map((r) => ({ ...r, is_infra: INFRA_IDS.has(r.id) }))
+  } finally {
+    db.close()
+  }
+}
+
 async function fetchTickTickSummary() {
   const projectsRes = await ticktickOps.getProjects()
   const projects = (projectsRes.data ?? []) as Project[]
@@ -285,7 +309,7 @@ async function fetchTickTickSummary() {
 export const summaryRoute = new Elysia().get(
   '/summary',
   async () => {
-    const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult] =
+    const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult, tasksResult] =
       await Promise.allSettled([
         fetchMonitors().then((monitors) => {
           const nonGroup = monitors.filter((m) => m.type !== 'group')
@@ -304,6 +328,7 @@ export const summaryRoute = new Elysia().get(
         fetchNtfySummary(),
         fetchGitHubSummary(),
         fetchTickTickSummary(),
+        Promise.resolve(fetchTasksSummary()),
       ])
 
     return {
@@ -314,6 +339,7 @@ export const summaryRoute = new Elysia().get(
       ntfy: settle(ntfyResult),
       github: settle(githubResult),
       ticktick: settle(ticktickResult),
+      tasks: settle(tasksResult!),
     }
   },
   {

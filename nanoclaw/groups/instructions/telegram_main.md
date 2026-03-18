@@ -100,7 +100,7 @@ For urgent findings, send a NTFY push notification so it reaches Johannes's phon
 
 Read the most recent file in `conversations/` (highest date prefix) to restore context from the previous session. This ensures continuity after container restarts and context compaction.
 
-For infrastructure or task-related requests, call `GET /summary` first — it returns UptimeKuma, Docker (homelab + VPS), NTFY recent alerts, GitHub notifications and open PRs/issues, and TickTick overdue/due-soon tasks in a single parallel fetch. Use this as your primary situational awareness snapshot instead of querying each source separately. Confirm exact path via `/openapi.json`.
+For infrastructure or task-related requests, call `GET /summary` first — it returns UptimeKuma, Docker (homelab + VPS), NTFY recent alerts, GitHub notifications and open PRs/issues, TickTick overdue/due-soon tasks, and **all scheduled tasks** in a single parallel fetch. Use this as your primary situational awareness snapshot instead of querying each source separately. Confirm exact path via `/openapi.json`.
 
 ## Memory
 
