@@ -8,7 +8,7 @@ import { ticktickRoutes } from "./routes/ticktick.js";
 import { ntfyRoutes } from "./routes/ntfy.js";
 import { uptimeKumaRoutes } from "./routes/uptime-kuma.js";
 import { githubRoutes } from "./routes/github.js";
-import { dockerRoutes } from "./routes/docker.js";
+import { dockerHomelabRoutes, dockerVpsRoutes } from "./routes/docker.js";
 import { registerCronJobs } from "./cron/index.js";
 
 await initTickTickClient();
@@ -52,7 +52,8 @@ new Elysia()
   .use(ntfyRoutes)
   .use(uptimeKumaRoutes)
   .use(githubRoutes)
-  .use(dockerRoutes)
+  .use(dockerHomelabRoutes)
+  .use(dockerVpsRoutes)
   .listen(4000);
 
 registerCronJobs();
