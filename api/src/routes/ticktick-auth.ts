@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { saveTokens, initTickTickClient } from '../clients/ticktick'
 
-const CALLBACK_URL = 'https://api.jkrumm.com/ticktick/auth/callback'
+const CALLBACK_URL = 'https://claude-remote-api.jkrumm.com/ticktick/auth/callback'
 const AUTH_URL = 'https://ticktick.com/oauth/authorize'
 const TOKEN_URL = 'https://ticktick.com/oauth/token'
 
