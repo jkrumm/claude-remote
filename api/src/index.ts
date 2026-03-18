@@ -10,6 +10,7 @@ import { uptimeKumaRoutes } from "./routes/uptime-kuma.js";
 import { githubRoutes } from "./routes/github.js";
 import { dockerHomelabRoutes, dockerVpsRoutes } from "./routes/docker.js";
 import { summaryRoute } from "./routes/summary.js";
+import { tasksRoute } from "./routes/tasks.js";
 import { registerCronJobs } from "./cron/index.js";
 
 await initTickTickClient();
@@ -57,6 +58,7 @@ new Elysia()
   .use(dockerHomelabRoutes)
   .use(dockerVpsRoutes)
   .use(summaryRoute)
+  .use(tasksRoute)
   .listen(4000);
 
 registerCronJobs();
