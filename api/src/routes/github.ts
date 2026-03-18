@@ -241,7 +241,7 @@ export const githubRoutes = new Elysia({ prefix: '/github' })
       return proxyToGitHub(request, `repos/${params.owner}/${params.repo}/contents/${filePath}${buildQuery(query)}`)
     },
     {
-      params: t.Object({ owner: t.String(), repo: t.String() }),
+      params: t.Object({ owner: t.String(), repo: t.String(), '*': t.String() }),
       query: t.Object({
         ref: t.Optional(t.String({ description: 'Branch, tag, or commit SHA' })),
       }),
