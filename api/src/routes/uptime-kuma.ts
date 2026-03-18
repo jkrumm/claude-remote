@@ -29,11 +29,11 @@ function parseMonitors(metrics: string): Array<{
     if (line.startsWith('#') || !line.trim()) continue
 
     const statusMatch = line.match(
-      /^monitor_status\{monitor_id="([^"]+)",monitor_name="([^"]+)",monitor_type="([^"]+)",monitor_url="([^"]+)"[^}]*\}\s+([\d.]+)/,
+      /^monitor_status\{monitor_id="([^"]+)",monitor_name="([^"]+)",monitor_type="([^"]+)"(?:,monitor_url="([^"]*)")?[^}]*\}\s+([\d.]+)/,
     )
     if (statusMatch) {
       const [, id, name, type, url, val] = statusMatch
-      statusMap.set(id, { id, name, type, url, status: Number(val) })
+      statusMap.set(id, { id, name, type, url: url ?? '', status: Number(val) })
       continue
     }
 
