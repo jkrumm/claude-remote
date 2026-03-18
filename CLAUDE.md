@@ -165,6 +165,12 @@ Only update `instructions/telegram_main.md` when:
 - A behavioral pattern needs adjustment (e.g. changing how health reports are structured)
 - Communication/formatting rules change
 
+### The `/summary` endpoint
+
+`GET /summary` aggregates UptimeKuma, Docker (homelab + VPS), NTFY (last 24h), GitHub notifications/open items, and TickTick overdue/due-soon tasks into a single parallel fetch. The nanoclaw agent calls it once at session start instead of querying sources piecemeal.
+
+**When adding new integrations to claude-remote-api**, consider whether key context (e.g. counts, alerts, recent items) should also be included in the `/summary` response in `api/src/routes/summary.ts`. The summary is the agent's primary situational awareness snapshot — it should reflect the most diagnostically useful slice of each integrated service.
+
 ---
 
 ## Shell aliases
