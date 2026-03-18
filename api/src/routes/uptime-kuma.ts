@@ -1,6 +1,18 @@
 import { Elysia, t } from 'elysia'
 import { fetchMonitors } from '../clients/uptime-kuma'
 
+const MonitorSchema = t.Object({
+  id: t.String(),
+  name: t.String(),
+  type: t.String(),
+  url: t.String(),
+  active: t.Boolean(),
+  status: t.Number({ description: '0=DOWN 1=UP 2=PENDING 3=MAINTENANCE' }),
+  ping: t.Union([t.Number(), t.Null()]),
+  uptime1d: t.Union([t.Number(), t.Null()]),
+  uptime30d: t.Union([t.Number(), t.Null()]),
+})
+
 export const uptimeKumaRoutes = new Elysia({ prefix: '/uptime-kuma' })
 
   .get(
@@ -9,10 +21,12 @@ export const uptimeKumaRoutes = new Elysia({ prefix: '/uptime-kuma' })
       return fetchMonitors()
     },
     {
-      response: t.Any({ description: 'All monitors with live status, ping, and uptime ratios' }),
+      response: t.Array(MonitorSchema),
       detail: {
         tags: ['UptimeKuma'],
         summary: 'Get all UptimeKuma monitors with live status and uptime',
+        description:
+          'Live status and ping via Socket.IO (per-request connect/disconnect). Uptime ratios (1d/30d) from Prometheus — null if unavailable.',
         security: [{ BearerAuth: [] }],
       },
     },
