@@ -249,8 +249,14 @@ function buildContainerArgs(
     args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
   }
 
-  // Expose the claude-remote-api to agent containers so skills can call it
+  // Expose the claude-remote-api to agent containers so skills can call it.
+  // Agent containers run on the default bridge network and cannot resolve
+  // container hostnames (e.g. claude-remote-api) that only exist on agent-net.
+  // AGENT_CLAUDE_REMOTE_API_URL lets docker-compose.yml supply a host-gateway
+  // URL (http://host.docker.internal:4000) separately from the container-name
+  // URL used by nanoclaw itself (CLAUDE_REMOTE_API_URL).
   const apiUrl =
+    process.env.AGENT_CLAUDE_REMOTE_API_URL ??
     process.env.CLAUDE_REMOTE_API_URL ??
     `http://${CONTAINER_HOST_GATEWAY}:4000`;
   const apiSecret = process.env.CLAUDE_REMOTE_API_SECRET ?? '';

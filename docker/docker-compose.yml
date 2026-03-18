@@ -132,6 +132,10 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
+      # Agent containers spawn on the default bridge (not agent-net) so they cannot
+      # resolve the container hostname. Use host.docker.internal instead (resolved via
+      # --add-host=host.docker.internal:host-gateway injected by hostGatewayArgs()).
+      - AGENT_CLAUDE_REMOTE_API_URL=http://host.docker.internal:4000
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
       - DOCKER_HOST=tcp://docker-proxy:2375
