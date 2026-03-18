@@ -6,7 +6,13 @@ bun.lock
 !api/bun.lock
 # nanoclaw local state (created at runtime by Docker)
 nanoclaw/store/
-nanoclaw/groups/
+nanoclaw/groups/*
+!nanoclaw/groups/global/
+nanoclaw/groups/global/*
+!nanoclaw/groups/global/CLAUDE.md
+!nanoclaw/groups/main/
+nanoclaw/groups/main/*
+!nanoclaw/groups/main/CLAUDE.md
 nanoclaw/logs/
 
 # Secrets (never commit)
