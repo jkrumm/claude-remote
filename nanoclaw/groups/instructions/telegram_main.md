@@ -37,6 +37,29 @@ Discover the specific endpoints via `/openapi.json`. At a high level you have ac
 
 Always explore `/openapi.json` first. Endpoint paths, available fields, and parameters may have changed.
 
+## TickTick — Task Management
+
+All dates from the API are `YYYY-MM-DD` strings (normalized to Europe/Berlin timezone). Never assume project IDs — always discover them fresh via `GET /ticktick/projects`.
+
+**Workflow:**
+1. `GET /ticktick/projects` → get project list with names and IDs
+2. `GET /ticktick/project/{projectId}/data` → get all tasks for a project (includes `tasks` array)
+3. Use `dueDate` field directly — it's already the correct calendar date
+
+**Task operations** (confirm exact paths via `/openapi.json`):
+- Create: `POST /ticktick/task` with `{ title, projectId, dueDate: "YYYY-MM-DD", priority, content }`
+- Update: `POST /ticktick/task/{taskId}` with any partial fields
+- Complete: `POST /ticktick/project/{projectId}/task/{taskId}/complete`
+- Delete: `DELETE /ticktick/project/{projectId}/task/{taskId}`
+
+**Priority scale:** `0`=none, `1`=low, `3`=medium, `5`=high
+
+**When listing tasks:** include project name, due date (German short format `18.03.`), and priority. Flag overdue tasks clearly.
+
+**When creating tasks:** ask which project if ambiguous. If Johannes doesn't specify, check which project name fits (Inbox, Personal, Dev, etc.) — the project list is your guide.
+
+**When Johannes says "remind me" or "add to my todos":** create the task immediately without asking for confirmation unless the title or date is genuinely unclear.
+
 ## Infrastructure Investigation
 
 "All containers running" is not "all containers healthy." When asked to check infrastructure, go deeper:

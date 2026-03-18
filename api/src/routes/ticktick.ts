@@ -1,6 +1,10 @@
 import { Elysia, t } from 'elysia'
 import { ticktickOps } from '../clients/ticktick'
 
+const TZ = 'Europe/Berlin'
+
+// ─── Inbound: accept YYYY-MM-DD, convert to TickTick's UTC-midnight ISO format ─
+
 // Convert YYYY-MM-DD to midnight in the given timezone expressed as UTC,
 // formatted as TickTick expects: "2026-03-10T23:00:00.000+0000".
 // Always sets startDate = dueDate (TickTick requires both for all-day tasks).
@@ -19,13 +23,48 @@ function toTickTickISO(yyyymmdd: string, tz: string): string {
 function normalizeDueDate(body: Record<string, unknown>): Record<string, unknown> {
   const { dueDate } = body
   if (!dueDate || typeof dueDate !== 'string') return body
-  const tz = typeof body.timeZone === 'string' ? body.timeZone : 'Europe/Berlin'
+  const tz = typeof body.timeZone === 'string' ? body.timeZone : TZ
   if (/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
     const iso = toTickTickISO(dueDate, tz)
     return { ...body, dueDate: iso, startDate: iso, isAllDay: true }
   }
   // Full ISO string passed through — still ensure startDate and isAllDay are set
   return { ...body, startDate: body.startDate ?? dueDate, isAllDay: true }
+}
+
+// ─── Outbound: convert TickTick's UTC-midnight ISO back to plain YYYY-MM-DD ──
+
+// TickTick stores all-day tasks as local-midnight UTC (e.g. a Berlin task due
+// 2026-03-18 is stored as "2026-03-17T23:00:00.000+0000"). Convert back to a
+// plain YYYY-MM-DD string in Europe/Berlin so clients never see the raw offset.
+// Idempotent: YYYY-MM-DD input passes through unchanged.
+function fromTickTickISO(iso: string): string {
+  return new Date(iso).toLocaleDateString('sv-SE', { timeZone: TZ })
+}
+
+function normalizeTaskDates(task: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...task }
+  if (typeof result.dueDate === 'string' && result.dueDate) {
+    result.dueDate = fromTickTickISO(result.dueDate)
+  }
+  if (typeof result.startDate === 'string' && result.startDate) {
+    result.startDate = fromTickTickISO(result.startDate)
+  }
+  return result
+}
+
+// Normalize SDK response { data: T } where T is a task or project data with tasks array.
+function normalizeSdkResponse(sdkResult: Record<string, unknown>): Record<string, unknown> {
+  const data = sdkResult.data
+  if (!data || typeof data !== 'object') return sdkResult
+  const d = data as Record<string, unknown>
+  if (Array.isArray(d.tasks)) {
+    return { ...sdkResult, data: { ...d, tasks: d.tasks.map(t => normalizeTaskDates(t as Record<string, unknown>)) } }
+  }
+  if (typeof d.id === 'string') {
+    return { ...sdkResult, data: normalizeTaskDates(d) }
+  }
+  return sdkResult
 }
 
 export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
@@ -39,7 +78,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
   })
   .get(
     '/project/:projectId/data',
-    ({ params }) => ticktickOps.getProjectData(params.projectId),
+    async ({ params }) => normalizeSdkResponse(await ticktickOps.getProjectData(params.projectId) as Record<string, unknown>),
     {
       params: t.Object({ projectId: t.String() }),
       response: t.Any({ description: 'Project with tasks and columns' }),
@@ -50,7 +89,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
       },
     },
   )
-  .post('/task', ({ body }) => ticktickOps.createTask(normalizeDueDate(body as Record<string, unknown>)), {
+  .post('/task', async ({ body }) => normalizeSdkResponse(await ticktickOps.createTask(normalizeDueDate(body as Record<string, unknown>)) as Record<string, unknown>), {
     body: t.Object(
       {
         title: t.String(),
@@ -76,7 +115,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     async ({ params, body }) => {
       const res = await ticktickOps.updateTask(params.taskId, normalizeDueDate(body as Record<string, unknown>))
       if (!res.ok) return new Response(await res.text(), { status: res.status })
-      return res.json()
+      return normalizeTaskDates(await res.json() as Record<string, unknown>)
     },
     {
       params: t.Object({ taskId: t.String() }),
