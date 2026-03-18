@@ -67,9 +67,14 @@ After registration, trigger the bot with `@Andy <message>` (or whatever `ASSISTA
 ```bash
 ssh homelab
 cd ~/SourceRoot/claude-remote
-docker build -t nanoclaw-agent:latest nanoclaw/container/
+./nanoclaw/container/build.sh
 ```
 This image is required before NanoClaw can spawn any agent containers. Rebuild whenever `nanoclaw/container/Dockerfile` or `nanoclaw/container/agent-runner/` changes.
+
+**Nightly auto-rebuild cron** (set up once per host, as the `jkrumm` user — picks up Claude Code SDK updates nightly):
+```bash
+echo '0 2 * * * cd ~/SourceRoot/claude-remote && docker compose -f docker/docker-compose.yml build nanoclaw 2>&1 | logger -t nanoclaw-build && ~/SourceRoot/claude-remote/nanoclaw/container/build.sh 2>&1 | logger -t nanoclaw-agent-build && docker restart claude-remote-nanoclaw 2>&1 | logger -t nanoclaw-restart' | crontab -
+```
 **Status**: DONE ✓
 
 ---
