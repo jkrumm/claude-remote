@@ -74,7 +74,9 @@ services:
       - DOCKER_PROXY_URL_VPS=${DOCKER_PROXY_URL_VPS}
       - NANOCLAW_DB_PATH=/nanoclaw-data/store/messages.db
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
-      - VIBEKANBAN_REFRESH_TOKEN=${VIBEKANBAN_REFRESH_TOKEN}
+      - VIBEKANBAN_JWT_SECRET=${VIBEKANBAN_JWT_SECRET}
+      - VIBEKANBAN_SERVICE_USER_ID=${VIBEKANBAN_SERVICE_USER_ID}
+      - VIBEKANBAN_SERVICE_SESSION_ID=${VIBEKANBAN_SERVICE_SESSION_ID}
     volumes:
       - api-data:/data
       - /home/claude-remote/nanoclaw-data:/nanoclaw-data:rw
