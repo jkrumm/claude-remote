@@ -1,46 +1,29 @@
 import { Elysia, t } from 'elysia'
 import { ticktickOps } from '../clients/ticktick'
 
-// TickTick account timezone — used to convert YYYY-MM-DD to the correct midnight UTC timestamp.
-// Must match the timezone configured in the TickTick account settings.
-const TZ = process.env.TICKTICK_TIMEZONE ?? 'Europe/Madrid'
+// ─── Inbound: accept YYYY-MM-DD, convert to UTC midnight ISO for TickTick ───
 
-// ─── Inbound: accept YYYY-MM-DD, convert to TickTick's UTC-midnight ISO format ─
-
-// Convert YYYY-MM-DD to midnight in the given timezone expressed as UTC,
-// formatted as TickTick expects: "2026-03-10T23:00:00.000+0000".
-// Always sets startDate = dueDate (TickTick requires both for all-day tasks).
-function toTickTickISO(yyyymmdd: string, tz: string): string {
-  const [y, m, d] = yyyymmdd.split('-').map(Number)
-  // Sample noon UTC to find the timezone offset on this date (avoids DST boundary issues)
-  const noonUTC = new Date(Date.UTC(y, m - 1, d, 12))
-  const localNoon = noonUTC.toLocaleString('sv-SE', { timeZone: tz })
-  const localHour = parseInt(localNoon.slice(11, 13)) // "2026-03-11 13:00:00" → 13
-  const offsetMs = (localHour - 12) * 3_600_000
-  return new Date(Date.UTC(y, m - 1, d) - offsetMs).toISOString().replace('Z', '+0000')
-}
-
-// Accept YYYY-MM-DD from clients and convert to TickTick ISO midnight + set isAllDay + startDate.
-// Only YYYY-MM-DD is accepted — full ISO strings are rejected to prevent double timezone conversion.
+// Convert YYYY-MM-DD to UTC midnight ISO string with timeZone: UTC.
+// TickTick treats the task as timezone-agnostic — the date is always correct
+// regardless of account timezone or where the user is physically located.
 function normalizeDueDate(body: Record<string, unknown>): Record<string, unknown> {
   const { dueDate } = body
   if (!dueDate || typeof dueDate !== 'string') return body
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
     throw new Error(`dueDate must be YYYY-MM-DD, got: ${dueDate}`)
   }
-  const tz = typeof body.timeZone === 'string' ? body.timeZone : TZ
-  const iso = toTickTickISO(dueDate, tz)
-  return { ...body, dueDate: iso, startDate: iso, isAllDay: true }
+  const iso = `${dueDate}T00:00:00+0000`
+  return { ...body, dueDate: iso, startDate: iso, isAllDay: true, timeZone: 'UTC' }
 }
 
-// ─── Outbound: convert TickTick's UTC-midnight ISO back to plain YYYY-MM-DD ──
+// ─── Outbound: extract plain YYYY-MM-DD from TickTick's ISO date string ──────
 
-// TickTick stores all-day tasks as local-midnight UTC (e.g. a Berlin task due
-// 2026-03-18 is stored as "2026-03-17T23:00:00.000+0000"). Convert back to a
-// plain YYYY-MM-DD string in Europe/Berlin so clients never see the raw offset.
+// All tasks created via this API have timeZone: UTC, so the date portion of the
+// ISO string is the correct calendar date. For legacy tasks with non-UTC offsets,
+// we still just return the date portion as-is (best effort).
 // Idempotent: YYYY-MM-DD input passes through unchanged.
 function fromTickTickISO(iso: string): string {
-  return new Date(iso).toLocaleDateString('sv-SE', { timeZone: TZ })
+  return iso.slice(0, 10)
 }
 
 function normalizeTaskDates(task: Record<string, unknown>): Record<string, unknown> {
@@ -99,7 +82,6 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
         priority: t.Optional(t.Number({ description: '0=none, 1=low, 3=medium, 5=high' })),
         content: t.Optional(t.String()),
         startDate: t.Optional(t.String()),
-        timeZone: t.Optional(t.String({ description: 'IANA timezone, e.g. Europe/Berlin. Defaults to Europe/Berlin.' })),
         isAllDay: t.Optional(t.Boolean()),
       },
       { additionalProperties: true },
