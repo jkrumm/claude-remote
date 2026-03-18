@@ -11,6 +11,7 @@ import { githubRoutes } from "./routes/github.js";
 import { dockerHomelabRoutes, dockerVpsRoutes } from "./routes/docker.js";
 import { summaryRoute } from "./routes/summary.js";
 import { tasksRoute } from "./routes/tasks.js";
+import { vibeKanbanRoutes } from "./routes/vibekanban.js";
 import { registerCronJobs } from "./cron/index.js";
 
 await initTickTickClient();
@@ -59,6 +60,7 @@ new Elysia()
   .use(dockerVpsRoutes)
   .use(summaryRoute)
   .use(tasksRoute)
+  .use(vibeKanbanRoutes)
   .listen(4000);
 
 registerCronJobs();

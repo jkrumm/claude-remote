@@ -3,6 +3,7 @@ import { Elysia, t } from 'elysia'
 import path from 'path'
 import { fetchMonitors } from '../clients/uptime-kuma.js'
 import { ticktickOps } from '../clients/ticktick.js'
+import * as vk from '../clients/vibekanban.js'
 import type { Project, Task } from '../generated/ticktick/types.gen.js'
 
 const NTFY_BASE_URL = process.env.NTFY_BASE_URL ?? 'https://ntfy.sh'
@@ -304,12 +305,70 @@ async function fetchTickTickSummary() {
   return { overdue, dueSoon }
 }
 
+async function fetchVibeKanbanSummary() {
+  const orgs = await vk.getOrganizations()
+  if (!orgs.length) return { organizations: [] }
+
+  const orgSummaries = await Promise.all(
+    orgs.map(async (org) => {
+      const projects = await vk.getProjects(org.id)
+
+      const projectSummaries = await Promise.all(
+        projects.map(async (project) => {
+          const [statuses, issues] = await Promise.all([
+            vk.getProjectStatuses(project.id),
+            vk.getIssues(project.id),
+          ])
+
+          const statusMap = new Map(statuses.map((s) => [s.id, s]))
+          const openIssues = issues.filter((i) => !i.completed_at)
+
+          const byStatus: Record<string, number> = {}
+          for (const issue of openIssues) {
+            const statusName = statusMap.get(issue.status_id)?.name ?? 'Unknown'
+            byStatus[statusName] = (byStatus[statusName] ?? 0) + 1
+          }
+
+          const recentOpen = openIssues
+            .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+            .slice(0, 10)
+            .map((i) => ({
+              simpleId: i.simple_id,
+              title: i.title,
+              priority: i.priority,
+              status: statusMap.get(i.status_id)?.name ?? 'Unknown',
+              updatedAt: i.updated_at.slice(0, 10),
+            }))
+
+          return {
+            id: project.id,
+            name: project.name,
+            totalIssues: issues.length,
+            openIssues: openIssues.length,
+            byStatus,
+            recentOpen,
+          }
+        }),
+      )
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        projects: projectSummaries,
+      }
+    }),
+  )
+
+  return { organizations: orgSummaries }
+}
+
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const summaryRoute = new Elysia().get(
   '/summary',
   async () => {
-    const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult, tasksResult] =
+    const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult, tasksResult, vibeKanbanResult] =
       await Promise.allSettled([
         fetchMonitors().then((monitors) => {
           const nonGroup = monitors.filter((m) => m.type !== 'group')
@@ -329,6 +388,7 @@ export const summaryRoute = new Elysia().get(
         fetchGitHubSummary(),
         fetchTickTickSummary(),
         Promise.resolve(fetchTasksSummary()),
+        fetchVibeKanbanSummary(),
       ])
 
     return {
@@ -340,6 +400,7 @@ export const summaryRoute = new Elysia().get(
       github: settle(githubResult),
       ticktick: settle(ticktickResult),
       tasks: settle(tasksResult!),
+      vibeKanban: settle(vibeKanbanResult),
     }
   },
   {
