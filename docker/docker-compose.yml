@@ -67,6 +67,7 @@ services:
       - UPTIME_KUMA_URL=${UPTIME_KUMA_URL}
       - UPTIME_KUMA_API_KEY=${UPTIME_KUMA_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - DOCKER_PROXY_URL=http://docker-proxy:2375
     volumes:
       - api-data:/data
     healthcheck:

@@ -8,6 +8,7 @@ import { notifyRoute } from "./routes/notify.js";
 import { ticktickRoutes } from "./routes/ticktick.js";
 import { homelabRoutes } from "./routes/homelab.js";
 import { githubRoutes } from "./routes/github.js";
+import { dockerRoutes } from "./routes/docker.js";
 import { registerCronJobs } from "./cron/index.js";
 
 await initTickTickClient();
@@ -33,7 +34,7 @@ new Elysia()
           title: "claude-remote-api",
           version: "0.1.0",
           description:
-            "Personal backend proxy for TickTick, NTFY, homelab monitoring (UptimeKuma, ntfy), and GitHub API. All endpoints except /health and /ticktick/auth/* require Bearer token authentication.",
+            "Personal backend proxy for TickTick, NTFY, homelab monitoring (UptimeKuma, ntfy), GitHub API, and Docker container monitoring. All endpoints except /health and /ticktick/auth/* require Bearer token authentication.",
         },
         servers: [{ url: "https://claude-remote-api.jkrumm.com", description: "Production" }],
         components: {
@@ -51,6 +52,7 @@ new Elysia()
   .use(ticktickRoutes)
   .use(homelabRoutes)
   .use(githubRoutes)
+  .use(dockerRoutes)
   .listen(4000);
 
 registerCronJobs();
