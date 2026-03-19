@@ -18,7 +18,8 @@ Single Node.js process with Telegram channel. Messages route to Claude Agent SDK
 | `src/container-runner.ts` | Spawns agent containers with mounts |
 | `src/task-scheduler.ts` | Runs scheduled tasks |
 | `src/db.ts` | SQLite operations |
-| `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
+| `groups/instructions/{name}.md` | Behavioral instructions injected as system prompt for that group |
+| `groups/global/CLAUDE.md` | Base context for non-main groups (Andy) |
 | `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
 
 ## Skills

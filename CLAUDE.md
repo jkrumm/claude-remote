@@ -36,8 +36,9 @@ You are running as the `claude-remote` user on a headless Ubuntu server. This is
 - `/notify` — send a push notification via NTFY
 - `/trigger-agent` — spawn a headless agent on another repo
 - `/api-bridge` — interact with the claude-remote-api
+- `/align-claude-remote` — full audit: fix OpenAPI schemas, align docs, deploy
 
-See `~/.claude/skills/` for all skill files.
+See `.claude/skills/` for project skills and `~/.claude/skills/` for user-level skills.
 
 ---
 
