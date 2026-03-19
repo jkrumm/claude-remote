@@ -212,6 +212,7 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
         const bytes = new Uint8Array(buf)
         // eslint-disable-next-line no-control-regex
         const ansiRe = /\x1b\[[0-9;]*[mGKHF]/g
+        const timestampRe = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s*/
         const lines: string[] = []
         let i = 0
         while (i + 8 <= bytes.length) {
@@ -222,7 +223,8 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
             bytes[i + 7]
           const payload = bytes.slice(i + 8, i + 8 + size)
           const line = new TextDecoder().decode(payload).replace(/\n$/, '').replace(ansiRe, '').trim()
-          if (line) lines.push(line)
+          // Skip lines that are empty or only contain a Docker timestamp with no message
+          if (line && line.replace(timestampRe, '').trim()) lines.push(line)
           i += 8 + size
         }
 
