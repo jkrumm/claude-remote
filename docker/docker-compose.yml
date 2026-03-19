@@ -5,7 +5,10 @@ networks:
     driver: bridge
   homelab:
     external: true
-    name: ${HOMELAB_NETWORK_NAME:-homelab_cloudflared}
+    name: ${HOMELAB_NETWORK_NAME:-homelab_cloudflared}  # Caddy reverse proxy: reaches api + vibekanban
+  monitoring:
+    external: true
+    name: homelab_shared  # Docker socket proxy access: CRA → docker-socket-proxy on homelab
 
 services:
 
@@ -55,6 +58,7 @@ services:
     networks:
       - agent-net
       - homelab
+      - monitoring
     ports:
       - "4000:4000"
     environment:
