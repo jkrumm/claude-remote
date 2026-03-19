@@ -83,6 +83,22 @@ function loadState(): void {
   }
   sessions = getAllSessions();
   registeredGroups = getAllRegisteredGroups();
+
+  // Auto-register main group from env on fresh start (no groups configured)
+  const mainJid = process.env.TELEGRAM_MAIN_CHAT_JID;
+  if (mainJid && Object.keys(registeredGroups).length === 0) {
+    logger.info({ jid: mainJid }, 'Auto-registering main group from TELEGRAM_MAIN_CHAT_JID');
+    setRegisteredGroup(mainJid, {
+      name: 'Main',
+      folder: 'telegram_main',
+      trigger: ASSISTANT_NAME,
+      added_at: new Date().toISOString(),
+      requiresTrigger: false,
+      isMain: true,
+    });
+    registeredGroups = getAllRegisteredGroups();
+  }
+
   logger.info(
     { groupCount: Object.keys(registeredGroups).length },
     'State loaded',
