@@ -189,6 +189,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      vibekanban:
+        condition: service_healthy
 
   # --- Azure blob storage emulator (for vibekanban attachments) ---
   azurite:
