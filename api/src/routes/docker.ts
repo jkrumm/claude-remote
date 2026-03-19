@@ -210,6 +210,8 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
         // Strip the header bytes and decode to plain text.
         const buf = await res.arrayBuffer()
         const bytes = new Uint8Array(buf)
+        // eslint-disable-next-line no-control-regex
+        const ansiRe = /\x1b\[[0-9;]*[mGKHF]/g
         const lines: string[] = []
         let i = 0
         while (i + 8 <= bytes.length) {
@@ -219,7 +221,8 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
             (bytes[i + 6] << 8) |
             bytes[i + 7]
           const payload = bytes.slice(i + 8, i + 8 + size)
-          lines.push(new TextDecoder().decode(payload).replace(/\n$/, ''))
+          const line = new TextDecoder().decode(payload).replace(/\n$/, '').replace(ansiRe, '').trim()
+          if (line) lines.push(line)
           i += 8 + size
         }
 
