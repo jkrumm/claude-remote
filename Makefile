@@ -18,8 +18,8 @@ logs: ## Follow watchdog logs
 restart: ## Restart watchdog container
 	$(COMPOSE) restart watchdog
 
-restart-api: ## Restart API container (re-seeds infra tasks on startup)
-	$(COMPOSE) restart claude-remote-api
+restart-api: ## Restart API container with secrets (re-seeds infra tasks on startup)
+	$(DOPPLER) $(COMPOSE) up -d --no-deps claude-remote-api
 
 ps: ## Show all running services
 	$(COMPOSE) ps
