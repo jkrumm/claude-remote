@@ -223,8 +223,11 @@ function buildContainerArgs(
   if (process.env.ANTHROPIC_API_KEY) {
     args.push('-e', `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
   }
-  if (process.env.ANTHROPIC_API_URL) {
-    args.push('-e', `ANTHROPIC_API_URL=${process.env.ANTHROPIC_API_URL}`);
+  // Claude Code SDK reads ANTHROPIC_BASE_URL; also set ANTHROPIC_API_URL for compatibility
+  const apiUrl = process.env.ANTHROPIC_API_URL || process.env.ANTHROPIC_BASE_URL;
+  if (apiUrl) {
+    args.push('-e', `ANTHROPIC_BASE_URL=${apiUrl}`);
+    args.push('-e', `ANTHROPIC_API_URL=${apiUrl}`);
   }
   if (process.env.ANTHROPIC_API_MODEL) {
     args.push('-e', `ANTHROPIC_API_MODEL=${process.env.ANTHROPIC_API_MODEL}`);
