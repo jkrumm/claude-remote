@@ -110,34 +110,49 @@ Rules:
 - Use **bold** for section headers, bullet lists for items
 - No markdown tables, no ## headings`
 
-const EVENING_PROMPT = `Evening wrap-up. Compose a concise motivating Telegram message for Johannes.
+const EVENING_PROMPT = `Evening wrap-up. Compose a warm, comprehensive Telegram message for Johannes celebrating his day.
 
 Steps:
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
-   → GitHub notifications, TickTick tasks
+   → GitHub notifications, TickTick tasks, system health
 
 2. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm (Bearer $CLAUDE_REMOTE_API_SECRET)
-   Then for active repos, check recent commits/PRs merged today:
+   For EVERY repo (not just "active" ones), fetch all commits since today 00:00:
    GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}
+   Collect: commit message, SHA, author date, repo name.
+   Also check pulls merged today:
+   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc
+   Include PRs where merged_at is today.
 
 3. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
-   → events_24h for today's incidents (type: issue_detected or resolved)
+   → events_24h for today's incidents
 
-4. Format and send the following as your response (Telegram markdown rules apply):
+4. Build the shipped list:
+   - Group commits and PRs by repo
+   - For each repo with activity: show repo name, count of commits, and the most meaningful commit messages (not all — pick the ones that convey real work, skip trivial ones like "fix typo" or "wip")
+   - Merged PRs get a ✅ prefix and are highlighted
+   - If a repo had 5+ commits, call that out — it signals a heavy session
+
+5. Format and send the following as your response (Telegram markdown rules apply):
 
 🌙 Day wrap — {DD.MM.YY}
 
-**Shipped** {PRs merged today, notable commits — or "Quiet day"}
-**Resolved** {monitoring issues fixed today from events_24h — skip if none}
-**System** {current health one line: "All clear" or list issues}
-**Tomorrow** {TickTick tasks due tomorrow, max 3 — title only}
+**Shipped**
+{For each repo with commits today: repo name in bold, commit count, bullet list of meaningful work. Merged PRs first with ✅. If nothing shipped: "Quiet day — rest is productive too"}
+
+**Incidents** {monitoring events from events_24h today: both detected and resolved, with duration if resolved — skip section if none}
+
+**System** {current health: "All clear ✅" or list open issues with restart counts}
+
+**Tomorrow** {TickTick tasks due tomorrow, max 4 — title + project}
 
 Rules:
-- Under 15 lines total
-- Tone: direct, factual, briefly acknowledge what got done
+- Up to 30 lines — this is the day's highlight reel, give it room
+- Tone: warm, genuinely appreciative, like a colleague who saw the work happen. If a lot got shipped, say so explicitly. If it was a heavy debugging day, acknowledge the grind. Never be robotic or flat.
+- A day with 10+ commits across repos deserves a sentence like "Productive day — serious output."
 - Skip sections with no content
 - Dates in German short format (18.03.)
-- Use **bold** for section headers, bullet lists for items
+- Use **bold** for section headers and repo names, bullet lists for items
 - No markdown tables, no ## headings`
 
 interface InfraTaskDef {
