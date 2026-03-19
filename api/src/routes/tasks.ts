@@ -1,11 +1,11 @@
 /**
- * Task management route — read/write access to nanoclaw's scheduled_tasks table.
+ * Task management route — read/write access to watchdog's scheduled_tasks table.
  *
  * Infrastructure tasks (IDs in INFRA_TASK_IDS) are seeded at API startup and
  * cannot be deleted. User-created tasks (created via POST /tasks) are fully
  * manageable.
  *
- * Requires NANOCLAW_DB_PATH env var pointing at nanoclaw's messages.db.
+ * Requires WATCHDOG_DB_PATH env var pointing at watchdog's messages.db.
  */
 
 import { Database } from 'bun:sqlite'
@@ -14,8 +14,8 @@ import { Elysia, t } from 'elysia'
 import path from 'path'
 
 const DB_PATH =
-  process.env.NANOCLAW_DB_PATH ??
-  path.join(process.env.HOME!, 'nanoclaw-data/store/messages.db')
+  process.env.WATCHDOG_DB_PATH ??
+  path.join(process.env.HOME!, 'watchdog-data/store/messages.db')
 
 // Infrastructure task IDs — seeded at startup, protected from deletion
 const INFRA_TASK_IDS = new Set([
@@ -263,7 +263,7 @@ export const tasksRoute = new Elysia({ prefix: '/tasks' })
       const db = new Database(DB_PATH)
       try {
         const mainGroup = getMainGroup(db)
-        if (!mainGroup) throw new Error('No main group registered in nanoclaw')
+        if (!mainGroup) throw new Error('No main group registered in watchdog')
 
         const id = `user-${Date.now()}`
         const now = new Date().toISOString()

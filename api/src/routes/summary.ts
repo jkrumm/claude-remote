@@ -234,8 +234,8 @@ async function fetchGitHubSummary() {
 
 function fetchTasksSummary() {
   const dbPath =
-    process.env.NANOCLAW_DB_PATH ??
-    path.join(process.env.HOME!, 'nanoclaw-data/store/messages.db')
+    process.env.WATCHDOG_DB_PATH ??
+    path.join(process.env.HOME!, 'watchdog-data/store/messages.db')
   const INFRA_IDS = new Set(['monitoring-hourly', 'monitoring-morning', 'monitoring-evening'])
   const db = new Database(dbPath, { readonly: true })
   try {

@@ -68,71 +68,53 @@ Secrets are scoped to the `claude-remote` project in Doppler.
 
 ---
 
-## Nanoclaw — Agent Architecture & Strategy
+## WatchDog — Agent Architecture & Strategy
 
 ### How agent context works
 
-Nanoclaw spawns a fresh Docker container per message. Context loads from scratch on every spawn — there is no persistent in-memory state.
+WatchDog spawns a fresh Docker container per message. Context loads from scratch on every spawn — there is no persistent in-memory state.
 
 **Context each group type receives:**
 
 | | Main group (`telegram_main`) | Non-main groups |
 |-|-|-|
 | Behavioral instructions | `groups/instructions/{folder}.md` injected as **system prompt append** (read-only mount) | `groups/global/CLAUDE.md` injected as **system prompt append** (read-only mount) |
-| Agent memory CWD | `/workspace/group` → `~/nanoclaw-data/groups/{folder}/` (read-write, no CLAUDE.md) | Same |
-| `/workspace/instructions` | Mounted read-only from `~/nanoclaw-data/groups/instructions/` | Not mounted |
+| Agent memory CWD | `/workspace/group` → `~/watchdog-data/groups/{folder}/` (read-write, no CLAUDE.md) | Same |
+| `/workspace/instructions` | Mounted read-only from `~/watchdog-data/groups/instructions/` | Not mounted |
 | `/workspace/global` | Not mounted | Mounted read-only |
-| `/workspace/project` | nanoclaw project root (read-only) | Not mounted |
+| `/workspace/project` | watchdog project root (read-only) | Not mounted |
 
 **Key facts:**
-- `main/CLAUDE.md` is never loaded — upstream nanoclaw template artifact, not in CWD or `additionalDirectories`
 - The agent's CWD (`/workspace/group`) contains only dynamic memory files — no CLAUDE.md lives there
 - Instructions are injected via `systemPrompt: { type: 'preset', preset: 'claude_code', append: content }` — the agent cannot read or write the source file
-
-### Why systemPrompt.append, not CWD CLAUDE.md
-
-NanoClaw upstream intends behavioral instructions to live as CLAUDE.md in the group's CWD folder, seeded from templates on registration. We diverge for two reasons:
-
-1. **Architectural guarantee:** The agent's CWD is read-write. Putting instructions there means the agent can technically overwrite them. Injecting via system prompt makes them immutable — not in any filesystem the agent can reach.
-
-2. **Upstream has a bug:** GitHub issue #755 documents that the register step doesn't actually copy CLAUDE.md into new group folders, leaving agents with no instructions. Our approach doesn't depend on a file being copied correctly.
-
-The Claude Agent SDK officially documents `systemPrompt.append` as one of four supported methods (alongside CLAUDE.md, output styles, and custom prompts). It's described as "session only" in the docs, but in nanoclaw's per-container architecture every message is a fresh session — so "loaded every time" is exactly what we want.
-
-Non-main groups already used this mechanism (`global/CLAUDE.md` → system prompt append). We extended it consistently to the main group.
+- Credentials injected directly as env vars — no proxy hop
 
 ### VCS vs runtime — the clean split
 
 ```
-nanoclaw/groups/instructions/{folder}.md  ← VCS only: behavioral instructions (never in agent's filesystem)
-nanoclaw/groups/global/CLAUDE.md          ← VCS only: base context for non-main groups
-~/nanoclaw-data/groups/{folder}/          ← runtime only: agent memory (conversations/, notes, etc.)
-~/nanoclaw-data/groups/instructions/      ← runtime only: synced from VCS, mounted read-only
+watchdog/groups/instructions/{folder}.md  ← VCS only: behavioral instructions (never in agent's filesystem)
+watchdog/groups/global/CLAUDE.md          ← VCS only: base context for non-main groups
+~/watchdog-data/groups/{folder}/          ← runtime only: agent memory (conversations/, notes, etc.)
+~/watchdog-data/groups/instructions/      ← runtime only: synced from VCS, mounted read-only
 ```
-
-Tracked in VCS (`nanoclaw/groups/`):
-- `instructions/telegram_main.md` — main agent's complete behavioral instructions
-- `global/CLAUDE.md` — base identity + API discovery for future non-main groups
-- `main/CLAUDE.md` — upstream template reference (not loaded, kept for reference)
-- `telegram_main/CLAUDE.md` — **does not exist**, group folder is pure memory space
 
 **To update agent instructions and sync to the live server:**
 ```bash
 # 1. Edit the instructions file
-vi nanoclaw/groups/instructions/telegram_main.md
+vi watchdog/groups/instructions/telegram_main.md
 
 # 2. Commit and push
-git add nanoclaw/groups/instructions/telegram_main.md
-git commit -m "docs(nanoclaw): ..."
+git add watchdog/groups/instructions/telegram_main.md
+git commit -m "docs(watchdog): ..."
 git push
 
-# 3. Pull on server and sync (no nanoclaw restart needed — read fresh per container spawn)
-ssh cr "cd ~/SourceRoot/claude-remote && git pull && cp nanoclaw/groups/instructions/telegram_main.md ~/nanoclaw-data/groups/instructions/telegram_main.md"
+# 3. Pull on server and sync (no watchdog restart needed — read fresh per container spawn)
+ssh cr "cd ~/SourceRoot/claude-remote && git pull && cp watchdog/groups/instructions/telegram_main.md ~/watchdog-data/groups/instructions/telegram_main.md"
 ```
 
 **After changing agent-runner or container-runner source code**, the agent container image must be rebuilt:
 ```bash
-ssh cr "cd ~/SourceRoot/claude-remote/nanoclaw && git pull && ./container/build.sh"
+ssh cr "cd ~/SourceRoot/claude-remote/watchdog && git pull && ./container/build.sh"
 ```
 
 ### The monitoring philosophy
@@ -161,15 +143,15 @@ Infrastructure changes constantly — containers get added, services move, APIs 
 When new routes are added to claude-remote-api: **no instruction changes needed.** The agent discovers new endpoints via `/openapi.json` automatically.
 
 Only update `instructions/telegram_main.md` when:
-- A new capability domain is added that needs conceptual framing (e.g. "you now have access to GitHub Actions status")
-- A behavioral pattern needs adjustment (e.g. changing how health reports are structured)
+- A new capability domain is added that needs conceptual framing
+- A behavioral pattern needs adjustment
 - Communication/formatting rules change
 
 ### The `/summary` endpoint
 
-`GET /summary` aggregates UptimeKuma, Docker (homelab + VPS), NTFY (last 24h), GitHub notifications/open items, and TickTick overdue/due-soon tasks into a single parallel fetch. The nanoclaw agent calls it once at session start instead of querying sources piecemeal.
+`GET /summary` aggregates UptimeKuma, Docker (homelab + VPS), NTFY (last 24h), GitHub notifications/open items, and TickTick overdue/due-soon tasks into a single parallel fetch. The watchdog agent calls it once at session start instead of querying sources piecemeal.
 
-**When adding new integrations to claude-remote-api**, consider whether key context (e.g. counts, alerts, recent items) should also be included in the `/summary` response in `api/src/routes/summary.ts`. The summary is the agent's primary situational awareness snapshot — it should reflect the most diagnostically useful slice of each integrated service.
+**When adding new integrations to claude-remote-api**, consider whether key context should also be included in `/summary` in `api/src/routes/summary.ts`.
 
 ### Proactive monitoring tasks
 
@@ -181,23 +163,21 @@ Three infrastructure tasks are defined in `api/src/routes/tasks.ts` and **seeded
 | `monitoring-morning` | `30 7 * * *` | Morning digest — system status, overnight events, today's tasks |
 | `monitoring-evening` | `0 23 * * *` | Evening wrap-up — shipped work, resolved incidents, tomorrow |
 
-All three run as `context_mode: isolated` against the main Telegram group. State is persisted in `~/nanoclaw-data/groups/telegram_main/monitoring_state.json`.
+All three run as `context_mode: isolated` against the main Telegram group. State is persisted in `~/watchdog-data/groups/telegram_main/monitoring_state.json`.
 
 **Task API** (managed via claude-remote-api, tag `Tasks` in `/openapi.json`):
 - `GET /tasks` — list all tasks (infra + user-created)
-- `POST /tasks` — Andy can create his own scheduled tasks
+- `POST /tasks` — create scheduled tasks
 - `PATCH /tasks/:id` — reschedule (set `next_run`) or pause/resume (`status`)
 - `DELETE /tasks/:id` — delete user-created tasks (infra tasks protected)
 
-**Infra tasks are identified by their IDs** (`monitoring-*`) and cannot be deleted. Andy can create user tasks with any schedule.
+**Infra tasks are identified by their IDs** (`monitoring-*`) and cannot be deleted.
 
 **To update infra task prompts:** edit `INFRA_TASKS` in `api/src/routes/tasks.ts`, then redeploy the API container. The API reseeds on startup but only inserts tasks that don't yet exist — so to update an existing prompt, delete the row first:
 ```bash
-sqlite3 ~/nanoclaw-data/store/messages.db "DELETE FROM scheduled_tasks WHERE id='monitoring-hourly'"
+sqlite3 ~/watchdog-data/store/messages.db "DELETE FROM scheduled_tasks WHERE id='monitoring-hourly'"
 # then restart the API container to reseed
 ```
-
-`nanoclaw/scripts/seed-monitoring-tasks.ts` is **deprecated** — superseded by the API's startup seeding.
 
 ---
 

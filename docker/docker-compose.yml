@@ -72,14 +72,14 @@ services:
       - GITHUB_TOKEN_CLASSIC=${GITHUB_TOKEN_CLASSIC}
       - DOCKER_PROXY_URL_HOMELAB=http://docker-proxy:2375
       - DOCKER_PROXY_URL_VPS=${DOCKER_PROXY_URL_VPS}
-      - NANOCLAW_DB_PATH=/nanoclaw-data/store/messages.db
+      - WATCHDOG_DB_PATH=/watchdog-data/store/messages.db
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
       - VIBEKANBAN_JWT_SECRET=${VIBEKANBAN_JWT_SECRET}
       - VIBEKANBAN_SERVICE_USER_ID=${VIBEKANBAN_SERVICE_USER_ID}
       - VIBEKANBAN_SERVICE_SESSION_ID=${VIBEKANBAN_SERVICE_SESSION_ID}
     volumes:
       - api-data:/data
-      - /home/claude-remote/nanoclaw-data:/nanoclaw-data:rw
+      - /home/claude-remote/watchdog-data:/watchdog-data:rw
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/health"]
       interval: 30s
@@ -89,44 +89,22 @@ services:
       postgres:
         condition: service_healthy
 
-  # --- Docker socket proxy (for NanoClaw) ---
-  # Limits Docker API surface exposed to nanoclaw: only container lifecycle ops allowed.
-  docker-proxy:
-    image: tecnativa/docker-socket-proxy:latest
-    container_name: claude-remote-docker-proxy
-    restart: unless-stopped
-    networks:
-      - agent-net
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - INFO=1
-      - CONTAINERS=1
-      - IMAGES=1
-      - NETWORKS=1
-      - POST=1
-      - DELETE=1
-
-  # --- NanoClaw Telegram bot ---
-  # Source lives in nanoclaw/ (root of claude-remote repo). Telegram channel applied via /add-telegram.
-  nanoclaw:
+  # --- WatchDog Telegram bot ---
+  # Source lives in watchdog/ (root of claude-remote repo). Telegram channel applied via /add-telegram.
+  watchdog:
     build:
-      context: ../nanoclaw
+      context: ../watchdog
       dockerfile: Dockerfile
-    container_name: claude-remote-nanoclaw
+    container_name: claude-remote-watchdog
     restart: unless-stopped
     networks:
       - agent-net
-    ports:
-      # Credential proxy — agent containers reach it via host.docker.internal:3001.
-      # Must be published so Docker's iptables NAT rules route traffic from the
-      # default bridge network (where agent containers run) to this container.
-      - "3001:3001"
     volumes:
-      # Bind mount (not named volume) so nanoclaw can pass the host-side path to the
+      # Bind mount (not named volume) so watchdog can pass the host-side path to the
       # Docker daemon when spawning agent containers (Docker-in-Docker bind mount fix).
-      - /home/claude-remote/nanoclaw-data:/data
-
+      - /home/claude-remote/watchdog-data:/data
+      # Direct Docker socket mount — agent containers are spawned via host daemon
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - CLAUDE_REMOTE_API_URL=http://claude-remote-api:4000
@@ -136,20 +114,16 @@ services:
       - AGENT_CLAUDE_REMOTE_API_URL=http://host.docker.internal:4000
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
-      - DOCKER_HOST=tcp://docker-proxy:2375
-      # Anthropic API credentials — injected via credential proxy, never exposed to containers
+      # Anthropic API credentials — injected directly into agent containers
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_API_URL=${ANTHROPIC_API_URL}
       # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
-      - HOST_DATA_DIR=/home/claude-remote/nanoclaw-data
-      # Agent container timeouts: keep below Docker proxy TCP idle (~10min) to avoid orphans.
+      - HOST_DATA_DIR=/home/claude-remote/watchdog-data
       - CONTAINER_TIMEOUT=480000
       - IDLE_TIMEOUT=480000
     depends_on:
       claude-remote-api:
         condition: service_healthy
-      docker-proxy:
-        condition: service_started
 
   # --- Vibekanban AI agent orchestration ---
   # Build from source: clone vibe-kanban to ~/SourceRoot/vibe-kanban (see MANUAL_TODOS.md M-06)
