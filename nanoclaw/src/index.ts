@@ -58,7 +58,7 @@ import {
   shouldDropMessage,
 } from './sender-allowlist.js';
 import { startSchedulerLoop } from './task-scheduler.js';
-import { startTokenRefreshLoop } from './token-refresh.js';
+import { resolveLatestHaikuModel } from './resolve-model.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
@@ -478,15 +478,17 @@ async function main(): Promise<void> {
   loadState();
   restoreRemoteControl();
 
+  // Resolve the model to use for agent containers. Queries /v1/models to
+  // pick the latest Haiku unless ANTHROPIC_API_MODEL is already set.
+  const resolvedModel = await resolveLatestHaikuModel();
+  process.env.ANTHROPIC_API_MODEL = resolvedModel;
+  logger.info({ model: resolvedModel }, 'Agent model configured');
+
   // Start credential proxy (containers route API calls through this)
   const proxyServer = await startCredentialProxy(
     CREDENTIAL_PROXY_PORT,
     PROXY_BIND_HOST,
   );
-
-  // Proactively refresh the OAuth token before it expires (8h lifetime).
-  // Runs once at startup (catches stale tokens) then every 6h.
-  startTokenRefreshLoop();
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {

@@ -78,7 +78,7 @@ describe('credential-proxy', () => {
     return (proxyServer.address() as AddressInfo).port;
   }
 
-  it('API-key mode injects x-api-key and strips placeholder', async () => {
+  it('injects x-api-key and strips placeholder from container', async () => {
     proxyPort = await startProxy({ ANTHROPIC_API_KEY: 'sk-ant-real-key' });
 
     await makeRequest(
@@ -97,35 +97,9 @@ describe('credential-proxy', () => {
     expect(lastUpstreamHeaders['x-api-key']).toBe('sk-ant-real-key');
   });
 
-  it('OAuth mode replaces Authorization when container sends one', async () => {
-    proxyPort = await startProxy({
-      CLAUDE_CODE_OAUTH_TOKEN: 'real-oauth-token',
-    });
+  it('strips authorization header from container', async () => {
+    proxyPort = await startProxy({ ANTHROPIC_API_KEY: 'sk-ant-real-key' });
 
-    await makeRequest(
-      proxyPort,
-      {
-        method: 'POST',
-        path: '/api/oauth/claude_cli/create_api_key',
-        headers: {
-          'content-type': 'application/json',
-          authorization: 'Bearer placeholder',
-        },
-      },
-      '{}',
-    );
-
-    expect(lastUpstreamHeaders['authorization']).toBe(
-      'Bearer real-oauth-token',
-    );
-  });
-
-  it('OAuth mode does not inject Authorization when container omits it', async () => {
-    proxyPort = await startProxy({
-      CLAUDE_CODE_OAUTH_TOKEN: 'real-oauth-token',
-    });
-
-    // Post-exchange: container uses x-api-key only, no Authorization header
     await makeRequest(
       proxyPort,
       {
@@ -133,14 +107,14 @@ describe('credential-proxy', () => {
         path: '/v1/messages',
         headers: {
           'content-type': 'application/json',
-          'x-api-key': 'temp-key-from-exchange',
+          authorization: 'Bearer some-token',
         },
       },
       '{}',
     );
 
-    expect(lastUpstreamHeaders['x-api-key']).toBe('temp-key-from-exchange');
     expect(lastUpstreamHeaders['authorization']).toBeUndefined();
+    expect(lastUpstreamHeaders['x-api-key']).toBe('sk-ant-real-key');
   });
 
   it('strips hop-by-hop headers', async () => {
@@ -161,9 +135,6 @@ describe('credential-proxy', () => {
       '{}',
     );
 
-    // Proxy strips client hop-by-hop headers. Node's HTTP client may re-add
-    // its own Connection header (standard HTTP/1.1 behavior), but the client's
-    // custom keep-alive and transfer-encoding must not be forwarded.
     expect(lastUpstreamHeaders['keep-alive']).toBeUndefined();
     expect(lastUpstreamHeaders['transfer-encoding']).toBeUndefined();
   });
@@ -188,5 +159,12 @@ describe('credential-proxy', () => {
 
     expect(res.statusCode).toBe(502);
     expect(res.body).toBe('Bad Gateway');
+  });
+
+  it('throws if ANTHROPIC_API_KEY is missing', async () => {
+    Object.assign(mockEnv, {
+      ANTHROPIC_BASE_URL: `http://127.0.0.1:${upstreamPort}`,
+    });
+    await expect(startCredentialProxy(0)).rejects.toThrow('ANTHROPIC_API_KEY');
   });
 });

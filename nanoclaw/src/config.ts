@@ -54,10 +54,14 @@ const _HOST_DATA_DIR = process.env.HOST_DATA_DIR ?? null;
 export function toHostMountPath(p: string): string {
   if (!_HOST_DATA_DIR) return p;
   if (p === '/app/data' || p === '/data') return _HOST_DATA_DIR;
-  if (p.startsWith('/app/data/')) return path.join(_HOST_DATA_DIR, p.slice('/app/data/'.length));
-  if (p.startsWith('/data/')) return path.join(_HOST_DATA_DIR, p.slice('/data/'.length));
-  if (p.startsWith('/app/groups/')) return path.join(_HOST_DATA_DIR, 'groups', p.slice('/app/groups/'.length));
-  if (p.startsWith('/app/store/')) return path.join(_HOST_DATA_DIR, 'store', p.slice('/app/store/'.length));
+  if (p.startsWith('/app/data/'))
+    return path.join(_HOST_DATA_DIR, p.slice('/app/data/'.length));
+  if (p.startsWith('/data/'))
+    return path.join(_HOST_DATA_DIR, p.slice('/data/'.length));
+  if (p.startsWith('/app/groups/'))
+    return path.join(_HOST_DATA_DIR, 'groups', p.slice('/app/groups/'.length));
+  if (p.startsWith('/app/store/'))
+    return path.join(_HOST_DATA_DIR, 'store', p.slice('/app/store/'.length));
   return p;
 }
 

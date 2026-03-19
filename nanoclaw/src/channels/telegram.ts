@@ -22,11 +22,11 @@ const telegramifyMarkdown = require('telegramify-markdown') as (
 // Strip inline markdown formatting from plain text (used inside table cells).
 function stripInlineMarkdown(text: string): string {
   return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')  // bold
-    .replace(/\*(.+?)\*/g, '$1')       // italic
-    .replace(/__(.+?)__/g, '$1')       // bold underscore
-    .replace(/_(.+?)_/g, '$1')         // italic underscore
-    .replace(/`(.+?)`/g, '$1');        // inline code
+    .replace(/\*\*(.+?)\*\*/g, '$1') // bold
+    .replace(/\*(.+?)\*/g, '$1') // italic
+    .replace(/__(.+?)__/g, '$1') // bold underscore
+    .replace(/_(.+?)_/g, '$1') // italic underscore
+    .replace(/`(.+?)`/g, '$1'); // inline code
 }
 
 // Telegram doesn't render Markdown tables — convert them to fixed-width
@@ -37,8 +37,7 @@ function preprocessTables(text: string): string {
   let tableLines: string[] = [];
 
   const isTableLine = (line: string) => /^\s*\|/.test(line);
-  const isSeparatorLine = (line: string) =>
-    /^\s*\|[\s|:\-]+\|\s*$/.test(line);
+  const isSeparatorLine = (line: string) => /^\s*\|[\s|:\-]+\|\s*$/.test(line);
 
   const flushTable = () => {
     if (tableLines.length === 0) return;
@@ -80,8 +79,9 @@ function preprocessTables(text: string): string {
 
 // Replace ISO dates (YYYY-MM-DD) with German short format (DD.MM.YY).
 function formatDates(text: string): string {
-  return text.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) =>
-    `${d}.${m}.${y.slice(2)}`,
+  return text.replace(
+    /\b(\d{4})-(\d{2})-(\d{2})\b/g,
+    (_, y, m, d) => `${d}.${m}.${y.slice(2)}`,
   );
 }
 
@@ -108,7 +108,9 @@ async function sendTelegramMessage(
   options: { message_thread_id?: number } = {},
 ): Promise<void> {
   try {
-    const preprocessed = formatHorizontalRules(formatDates(preprocessTables(text)));
+    const preprocessed = formatHorizontalRules(
+      formatDates(preprocessTables(text)),
+    );
     const converted = telegramifyMarkdown(preprocessed, 'escape');
     await api.sendMessage(chatId, converted, {
       ...options,

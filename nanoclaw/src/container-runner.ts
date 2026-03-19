@@ -27,7 +27,7 @@ import {
   readonlyMountArgs,
   stopContainer,
 } from './container-runtime.js';
-import { detectAuthMode } from './credential-proxy.js';
+
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
 
@@ -238,16 +238,9 @@ function buildContainerArgs(
     `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`,
   );
 
-  // Mirror the host's auth method with a placeholder value.
-  // API key mode: SDK sends x-api-key, proxy replaces with real key.
-  // OAuth mode:   SDK exchanges placeholder token for temp API key,
-  //               proxy injects real OAuth token on that exchange request.
-  const authMode = detectAuthMode();
-  if (authMode === 'api-key') {
-    args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-  } else {
-    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-  }
+  // Placeholder API key — the credential proxy injects the real key on every request.
+  // Containers never see the real secret.
+  args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
 
   // Expose the claude-remote-api to agent containers so skills can call it.
   // Agent containers run on the default bridge network and cannot resolve
@@ -264,8 +257,8 @@ function buildContainerArgs(
   args.push('-e', `CLAUDE_REMOTE_API_SECRET=${apiSecret}`);
 
   // Forward model and session config from nanoclaw env to agent containers
-  if (process.env.NANOCLAW_MODEL) {
-    args.push('-e', `NANOCLAW_MODEL=${process.env.NANOCLAW_MODEL}`);
+  if (process.env.ANTHROPIC_API_MODEL) {
+    args.push('-e', `ANTHROPIC_API_MODEL=${process.env.ANTHROPIC_API_MODEL}`);
   }
   if (process.env.SESSION_MAX_QUERIES) {
     args.push('-e', `SESSION_MAX_QUERIES=${process.env.SESSION_MAX_QUERIES}`);

@@ -401,7 +401,7 @@ async function runQuery(
   for await (const message of query({
     prompt: stream,
     options: {
-      model: process.env.NANOCLAW_MODEL || 'claude-haiku-4-5-20251001',
+      model: process.env.ANTHROPIC_API_MODEL || 'claude-haiku-4-5-20251001',
       cwd: '/workspace/group',
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
