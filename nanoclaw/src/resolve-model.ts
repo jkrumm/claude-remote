@@ -34,12 +34,16 @@ export async function resolveLatestHaikuModel(): Promise<string> {
   const baseUrl = getUpstreamBaseUrl().replace(/\/$/, '');
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`${baseUrl}/v1/models`, {
+      signal: controller.signal,
       headers: {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
     });
+    clearTimeout(timer);
 
     if (!res.ok) {
       const body = await res.text();
