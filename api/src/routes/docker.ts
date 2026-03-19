@@ -95,7 +95,18 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
         return enriched
       },
       {
-        response: t.Any({ description: 'All containers with state, health and restart info' }),
+        response: t.Array(
+          t.Object({
+            id: t.String({ description: 'Short 12-char container ID' }),
+            name: t.String(),
+            image: t.String(),
+            state: t.String({ description: 'running | exited | paused | created | restarting' }),
+            status: t.String({ description: 'Human-readable status string from Docker' }),
+            health: t.String({ description: 'healthy | unhealthy | starting | none' }),
+            startedAt: t.Union([t.String(), t.Null()]),
+            restartCount: t.Number({ description: 'Total restart count since container creation' }),
+          }),
+        ),
         detail: {
           tags: [tag],
           summary: 'List all containers (running + stopped) with health and restart count',
@@ -148,7 +159,23 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
         return stats
       },
       {
-        response: t.Any({ description: 'CPU/memory/network stats for all running containers' }),
+        response: t.Array(
+          t.Union([
+            t.Object({
+              name: t.String(),
+              cpuPercent: t.Number({ description: 'CPU usage as percentage of all cores' }),
+              memUsageMB: t.Number({ description: 'Current memory usage in MiB' }),
+              memLimitMB: t.Number({ description: 'Container memory limit in MiB' }),
+              memPercent: t.Number({ description: 'Memory usage as percentage of limit' }),
+              netRxMB: t.Number({ description: 'Total network bytes received in MB' }),
+              netTxMB: t.Number({ description: 'Total network bytes transmitted in MB' }),
+            }),
+            t.Object({
+              name: t.String(),
+              error: t.String({ description: 'Error message if stats were unavailable' }),
+            }),
+          ]),
+        ),
         detail: {
           tags: [tag],
           summary: 'Resource usage (CPU%, memory MB, network I/O) for all running containers',
@@ -201,7 +228,11 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
       {
         params: t.Object({ name: t.String() }),
         query: t.Object({ tail: t.Optional(t.String()) }),
-        response: t.Any({ description: 'Recent log lines for the container' }),
+        response: t.Object({
+          container: t.String(),
+          tail: t.Number({ description: 'Number of log lines requested' }),
+          lines: t.Array(t.String({ description: 'Log line with RFC3339 timestamp prefix' })),
+        }),
         detail: {
           tags: [tag],
           summary: 'Fetch recent log lines for a container by name (default: last 100)',
@@ -288,8 +319,35 @@ function createDockerRoutes(proxyUrl: string, tag: string): Elysia {
         }
       },
       {
-        response: t.Any({
-          description: 'High-level Docker overview: host info, container health, alerts',
+        response: t.Object({
+          host: t.Object({
+            cpus: t.Number(),
+            totalMemoryGB: t.Number(),
+            dockerVersion: t.String(),
+          }),
+          counts: t.Object({
+            total: t.Number(),
+            running: t.Number(),
+            stopped: t.Number(),
+          }),
+          alerts: t.Object({
+            unhealthyContainers: t.Array(t.String()),
+            highRestartContainers: t.Array(
+              t.Object({
+                name: t.String(),
+                restarts: t.Number({ description: 'Restart count (>3 triggers alert)' }),
+              }),
+            ),
+          }),
+          running: t.Array(
+            t.Object({
+              name: t.String(),
+              health: t.String({ description: 'healthy | unhealthy | starting | none' }),
+              restartCount: t.Number(),
+              startedAt: t.Union([t.String(), t.Null()]),
+            }),
+          ),
+          stopped: t.Array(t.Object({ name: t.String(), status: t.String() })),
         }),
         detail: {
           tags: [tag],

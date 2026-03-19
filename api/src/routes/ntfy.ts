@@ -43,7 +43,7 @@ export const ntfyRoutes = new Elysia({ prefix: '/ntfy' })
       return (account.subscriptions ?? []).map((s) => s.topic)
     },
     {
-      response: t.Any({ description: 'Array of subscribed ntfy topic names' }),
+      response: t.Array(t.String({ description: 'ntfy topic name' })),
       detail: {
         tags: ['Ntfy'],
         summary: 'List all subscribed ntfy topics for this account',
@@ -68,7 +68,20 @@ export const ntfyRoutes = new Elysia({ prefix: '/ntfy' })
     },
     {
       query: t.Object({ topic: t.String() }),
-      response: t.Any({ description: 'Array of ntfy messages from the topic' }),
+      response: t.Array(
+        t.Object({
+          id: t.Optional(t.String()),
+          event: t.Optional(t.String()),
+          time: t.Optional(t.Number({ description: 'Unix timestamp' })),
+          topic: t.Optional(t.String()),
+          title: t.Optional(t.String()),
+          message: t.Optional(t.String()),
+          priority: t.Optional(
+            t.Number({ minimum: 1, maximum: 5, description: '1=min 2=low 3=default 4=high 5=max' }),
+          ),
+          tags: t.Optional(t.Array(t.String())),
+        }),
+      ),
       detail: {
         tags: ['Ntfy'],
         summary: 'Fetch recent messages from an ntfy topic (poll, no streaming)',

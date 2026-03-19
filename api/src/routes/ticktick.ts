@@ -51,9 +51,36 @@ function normalizeSdkResponse(sdkResult: Record<string, unknown>): Record<string
   return sdkResult
 }
 
+const TaskSchema = t.Object({
+  id: t.Optional(t.String()),
+  projectId: t.Optional(t.String()),
+  title: t.Optional(t.String()),
+  content: t.Optional(t.String()),
+  desc: t.Optional(t.String()),
+  dueDate: t.Optional(t.String({ description: 'YYYY-MM-DD' })),
+  startDate: t.Optional(t.String({ description: 'YYYY-MM-DD' })),
+  priority: t.Optional(t.Number({ description: '0=none 1=low 3=medium 5=high' })),
+  status: t.Optional(t.Number({ description: '0=active 2=completed' })),
+  isAllDay: t.Optional(t.Union([t.String(), t.Boolean()])),
+  completedTime: t.Optional(t.String()),
+  timeZone: t.Optional(t.String()),
+  sortOrder: t.Optional(t.Number()),
+})
+
+const ProjectSchema = t.Object({
+  id: t.Optional(t.String()),
+  name: t.Optional(t.String()),
+  color: t.Optional(t.Union([t.String(), t.Null()])),
+  closed: t.Optional(t.Union([t.Boolean(), t.Null()])),
+  viewMode: t.Optional(t.Union([t.String(), t.Null()])),
+  permission: t.Optional(t.Union([t.String(), t.Null()])),
+  kind: t.Optional(t.Union([t.String(), t.Null()])),
+})
+
 export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
-  .get('/projects', () => ticktickOps.getProjects(), {
-    response: t.Any({ description: 'Array of TickTick projects' }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .get('/projects', () => ticktickOps.getProjects() as any, {
+    response: t.Object({ data: t.Array(ProjectSchema) }),
     detail: {
       tags: ['TickTick'],
       summary: 'Get all projects',
@@ -62,10 +89,16 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
   })
   .get(
     '/project/:projectId/data',
-    async ({ params }) => normalizeSdkResponse(await ticktickOps.getProjectData(params.projectId) as Record<string, unknown>),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async ({ params }) => normalizeSdkResponse(await ticktickOps.getProjectData(params.projectId) as Record<string, unknown>) as any,
     {
       params: t.Object({ projectId: t.String() }),
-      response: t.Any({ description: 'Project with tasks and columns' }),
+      response: t.Object({
+        data: t.Object({
+          tasks: t.Array(TaskSchema),
+          columns: t.Optional(t.Array(t.Object({ id: t.Optional(t.String()), name: t.Optional(t.String()) }))),
+        }),
+      }),
       detail: {
         tags: ['TickTick'],
         summary: 'Get project with tasks and columns',
@@ -73,7 +106,8 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
       },
     },
   )
-  .post('/task', async ({ body }) => normalizeSdkResponse(await ticktickOps.createTask(normalizeDueDate(body as Record<string, unknown>)) as Record<string, unknown>), {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .post('/task', async ({ body }) => normalizeSdkResponse(await ticktickOps.createTask(normalizeDueDate(body as Record<string, unknown>)) as Record<string, unknown>) as any, {
     body: t.Object(
       {
         title: t.String(),
@@ -86,7 +120,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
       },
       { additionalProperties: true },
     ),
-    response: t.Any({ description: 'Created task object' }),
+    response: t.Object({ data: TaskSchema }),
     detail: {
       tags: ['TickTick'],
       summary: 'Create a task',
@@ -95,7 +129,8 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
   })
   .post(
     '/task/:taskId',
-    async ({ params, body }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async ({ params, body }): Promise<any> => {
       const res = await ticktickOps.updateTask(params.taskId, normalizeDueDate(body as Record<string, unknown>))
       if (!res.ok) return new Response(await res.text(), { status: res.status })
       return normalizeTaskDates(await res.json() as Record<string, unknown>)
@@ -113,7 +148,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
         },
         { additionalProperties: true },
       ),
-      response: t.Any({ description: 'Updated task object' }),
+      response: TaskSchema,
       detail: {
         tags: ['TickTick'],
         summary: 'Update a task',
@@ -126,7 +161,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     ({ params }) => ticktickOps.completeTask(params.projectId, params.taskId),
     {
       params: t.Object({ projectId: t.String(), taskId: t.String() }),
-      response: t.Any({ description: 'Completion result' }),
+      response: t.Object({ data: t.Any() }),
       detail: {
         tags: ['TickTick'],
         summary: 'Mark task as complete',
@@ -139,7 +174,7 @@ export const ticktickRoutes = new Elysia({ prefix: '/ticktick' })
     ({ params }) => ticktickOps.deleteTask(params.projectId, params.taskId),
     {
       params: t.Object({ projectId: t.String(), taskId: t.String() }),
-      response: t.Any({ description: 'Deletion result' }),
+      response: t.Object({ data: t.Any() }),
       detail: {
         tags: ['TickTick'],
         summary: 'Delete a task',

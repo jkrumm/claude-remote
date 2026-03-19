@@ -363,11 +363,132 @@ async function fetchVibeKanbanSummary() {
   return { organizations: orgSummaries }
 }
 
+// ─── Response Schema ─────────────────────────────────────────────────────────
+
+const errSchema = t.Object({ error: t.String() })
+
+const DockerSummarySchema = t.Object({
+  host: t.Object({ cpus: t.Number(), totalMemoryGB: t.Number(), dockerVersion: t.String() }),
+  counts: t.Object({ total: t.Number(), running: t.Number(), stopped: t.Number() }),
+  alerts: t.Object({
+    unhealthyContainers: t.Array(t.String()),
+    highRestartContainers: t.Array(t.Object({ name: t.String(), restarts: t.Number() })),
+  }),
+})
+
+const NtfyMessageSchema = t.Object({
+  topic: t.String(),
+  title: t.Optional(t.String()),
+  message: t.String(),
+  time: t.Number({ description: 'Unix timestamp' }),
+  priority: t.Optional(t.Number({ description: '1=min 2=low 3=default 4=high 5=max' })),
+})
+
+const GHNotificationSchema = t.Object({
+  repo: t.String(),
+  type: t.String(),
+  title: t.String(),
+  reason: t.String(),
+  updatedAt: t.String(),
+})
+
+const GHOpenItemSchema = t.Object({
+  repo: t.String(),
+  number: t.Number(),
+  type: t.Union([t.Literal('pr'), t.Literal('issue')]),
+  title: t.String(),
+  state: t.String(),
+  updatedAt: t.String(),
+})
+
+const TickTaskItemSchema = t.Object({
+  id: t.String(),
+  title: t.String(),
+  dueDate: t.String({ description: 'YYYY-MM-DD' }),
+  projectName: t.String(),
+  priority: t.Number({ description: '0=none 1=low 3=medium 5=high' }),
+})
+
+const ScheduledTaskSchema = t.Object({
+  id: t.String(),
+  schedule_value: t.String(),
+  status: t.String({ description: 'active | paused | completed' }),
+  next_run: t.Union([t.String(), t.Null()]),
+  last_run: t.Union([t.String(), t.Null()]),
+  is_infra: t.Boolean({ description: 'true for monitoring-hourly/morning/evening (protected)' }),
+})
+
+const VKIssueSchema = t.Object({
+  simpleId: t.Number(),
+  title: t.String(),
+  priority: t.String(),
+  status: t.String(),
+  updatedAt: t.String(),
+})
+
+const SummaryResponseSchema = t.Object({
+  generatedAt: t.String({ description: 'ISO timestamp when summary was generated' }),
+  uptimeKuma: t.Union([
+    t.Object({
+      up: t.Number(),
+      down: t.Number(),
+      maintenance: t.Number(),
+      total: t.Number(),
+      downMonitors: t.Array(
+        t.Object({ name: t.String(), type: t.String(), uptime1d: t.Union([t.Number(), t.Null()]) }),
+      ),
+    }),
+    errSchema,
+  ]),
+  dockerHomelab: t.Union([DockerSummarySchema, errSchema]),
+  dockerVps: t.Union([DockerSummarySchema, errSchema]),
+  ntfy: t.Union([
+    t.Object({ topics: t.Array(t.String()), messages: t.Array(NtfyMessageSchema) }),
+    errSchema,
+  ]),
+  github: t.Union([
+    t.Object({
+      unreadCount: t.Number(),
+      notifications: t.Array(GHNotificationSchema),
+      openItems: t.Array(GHOpenItemSchema),
+    }),
+    errSchema,
+  ]),
+  ticktick: t.Union([
+    t.Object({ overdue: t.Array(TickTaskItemSchema), dueSoon: t.Array(TickTaskItemSchema) }),
+    errSchema,
+  ]),
+  tasks: t.Union([t.Array(ScheduledTaskSchema), errSchema]),
+  vibeKanban: t.Union([
+    t.Object({
+      organizations: t.Array(
+        t.Object({
+          id: t.String(),
+          name: t.String(),
+          slug: t.String(),
+          projects: t.Array(
+            t.Object({
+              id: t.String(),
+              name: t.String(),
+              totalIssues: t.Number(),
+              openIssues: t.Number(),
+              byStatus: t.Record(t.String(), t.Number()),
+              recentOpen: t.Array(VKIssueSchema),
+            }),
+          ),
+        }),
+      ),
+    }),
+    errSchema,
+  ]),
+})
+
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const summaryRoute = new Elysia().get(
   '/summary',
-  async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async (): Promise<any> => {
     const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult, tasksResult, vibeKanbanResult] =
       await Promise.allSettled([
         fetchMonitors().then((monitors) => {
@@ -404,7 +525,7 @@ export const summaryRoute = new Elysia().get(
     }
   },
   {
-    response: t.Any({ description: 'Aggregated health context: UptimeKuma, Docker, NTFY, GitHub, TickTick' }),
+    response: SummaryResponseSchema,
     detail: {
       tags: ['Summary'],
       summary: 'Aggregated health snapshot for all integrated services — single call for AI session context',
