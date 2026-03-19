@@ -116,53 +116,56 @@ Rules:
 - Use **bold** for section headers, bullet lists for items
 - No markdown tables, no ## headings`
 
-const EVENING_PROMPT = `Evening wrap-up. Compose a warm, comprehensive Telegram message for Johannes celebrating his day.
+const EVENING_PROMPT = `Evening wrap-up. Write a Telegram message for Johannes that reads like a proper end-of-day debrief — not a bullet dump, not a novel.
+
+IMPORTANT: Your entire response is the Telegram message. Do not add preamble, do not say "Here is your report" or "Done!". Start directly with the 🌙 emoji.
 
 Steps:
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
    → GitHub notifications, TickTick tasks, system health
 
 2. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/user/repos?sort=pushed&per_page=50 (Bearer $CLAUDE_REMOTE_API_SECRET)
-   → list of all repos. If this returns an error (non-200 or { message } field), send NTFY:
-     { "title": "⚠️ Evening report: GitHub fetch failed", "message": "{error details}", "priority": "high" }
-   Then stop — don't proceed with stale/empty data.
+   If error (non-200 or { message } field): send NTFY { "title": "⚠️ Evening report: GitHub fetch failed", "message": "{error}", "priority": "high" } and stop.
 
-   For repos pushed_at >= today 00:00, fetch commits and PRs:
+   For every repo where pushed_at >= today 00:00, fetch:
    GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}&per_page=50
    GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=20
-   Include PRs where merged_at is today.
-   Collect: commit message, SHA, author date, repo name.
+   Collect commits and PRs merged today (merged_at is today).
 
-3. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
-   → events_24h for today's incidents
+3. Read monitoring_state.json from /workspace/group/monitoring_state.json → events_24h for today.
 
-4. Build the shipped list:
-   - Group commits and PRs by repo
-   - For each repo with activity: show repo name, count of commits, and the most meaningful commit messages (not all — pick the ones that convey real work, skip trivial ones like "fix typo" or "wip")
-   - Merged PRs get a ✅ prefix and are highlighted
-   - If a repo had 5+ commits, call that out — it signals a heavy session
+4. Compose the message:
 
-5. Format and send the following as your response (Telegram markdown rules apply):
-
+---
 🌙 Day wrap — {DD.MM.YY}
 
+{One sentence characterising the day — e.g. "Heavy session." / "Solid output." / "Quiet but focused." Base it on total commit count and nature of work.}
+
 **Shipped**
-{For each repo with commits today: repo name in bold, commit count, bullet list of meaningful work. Merged PRs first with ✅. If nothing shipped: "Quiet day — rest is productive too"}
+For each repo that had commits today, write 2–4 lines:
+- **{repo name}** — {N commits}{, PR merged if applicable}
+  {1–2 sentences describing what the work actually was — what problem was solved, what feature landed, what got refactored. Read the commit messages to infer this. Don't just list them.}
+  {If a PR was merged: ✅ {PR title}}
 
-**Incidents** {monitoring events from events_24h today: both detected and resolved, with duration if resolved — skip section if none}
+If nothing shipped: "Quiet day — rest is productive too."
 
-**System** {current health: "All clear ✅" or list open issues with restart counts}
+**Incidents** (skip if none)
+{For each event in events_24h today: one line per issue — what happened and how long it lasted if resolved.}
 
-**Tomorrow** {TickTick tasks due tomorrow, max 4 — title + project}
+**System**
+{One line: "All clear ✅" or list containers with elevated restart counts.}
 
-Rules:
-- Up to 30 lines — this is the day's highlight reel, give it room
-- Tone: warm, genuinely appreciative, like a colleague who saw the work happen. If a lot got shipped, say so explicitly. If it was a heavy debugging day, acknowledge the grind. Never be robotic or flat.
-- A day with 10+ commits across repos deserves a sentence like "Productive day — serious output."
-- Skip sections with no content
-- Dates in German short format (18.03.)
-- Use **bold** for section headers and repo names, bullet lists for items
-- No markdown tables, no ## headings`
+**Tomorrow** (skip if nothing due)
+{TickTick tasks due tomorrow, max 4, one per line — title + project.}
+---
+
+Tone rules:
+- Warm but not gushing. Like a colleague who was watching the work happen.
+- If total commits > 20: say so and mean it. That's a serious day.
+- If it was mostly debugging/infra: acknowledge the grind explicitly.
+- Never robotic. Never just a list of commit messages.
+- Dates in German short format (19.03.)
+- Bold for section headers and repo names. No markdown tables, no ## headings.`
 
 interface InfraTaskDef {
   id: string

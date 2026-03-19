@@ -1,4 +1,4 @@
-.PHONY: deploy restart-api restart-watchdog restart-vibekanban build-agent \
+.PHONY: deploy restart restart-api restart-watchdog restart-vibekanban build-agent \
         logs logs-api logs-vibekanban ps status trigger-evening trigger-morning trigger-hourly help
 
 SSH     = ssh cr
@@ -12,7 +12,7 @@ INFRA_TASKS = 'monitoring-hourly','monitoring-morning','monitoring-evening'
 
 # ── Full stack ─────────────────────────────────────────────────────────────────
 
-deploy: ## Pull and rebuild everything — api, watchdog, vibekanban — then reseed tasks
+deploy: ## Pull and rebuild everything including vibekanban — full cold deploy
 	$(SSH) "cd $(REPO) && git pull"
 	$(SSH) "cp $(INSTRUCTIONS_SRC) $(INSTRUCTIONS_DEST)"
 	$(SSH) "sqlite3 $(DB) \"DELETE FROM scheduled_tasks WHERE id IN ($(INFRA_TASKS))\""
@@ -22,9 +22,22 @@ deploy: ## Pull and rebuild everything — api, watchdog, vibekanban — then re
 	@sleep 8
 	$(SSH) "sqlite3 $(DB) \"SELECT id, next_run FROM scheduled_tasks WHERE id LIKE 'monitoring-%'\""
 
-# ── API ────────────────────────────────────────────────────────────────────────
+# ── API + Watchdog (primary — use this for any code or prompt change) ──────────
 
-restart-api: ## Pull, rebuild API image, reseed infra tasks, redeploy — verify tasks
+restart: ## Pull, rebuild API + watchdog, sync instructions, reseed tasks — verify all
+	$(SSH) "cd $(REPO) && git pull"
+	$(SSH) "cp $(INSTRUCTIONS_SRC) $(INSTRUCTIONS_DEST)"
+	$(SSH) "sqlite3 $(DB) \"DELETE FROM scheduled_tasks WHERE id IN ($(INFRA_TASKS))\""
+	$(SSH) "cd $(REPO) && $(DOPPLER) $(COMPOSE) build --no-cache claude-remote-api watchdog"
+	$(SSH) "cd $(REPO) && $(DOPPLER) $(COMPOSE) up -d --no-deps claude-remote-api watchdog"
+	@echo "Waiting for API to seed tasks..."
+	@sleep 8
+	$(SSH) "sqlite3 $(DB) \"SELECT id, next_run FROM scheduled_tasks WHERE id LIKE 'monitoring-%'\""
+	$(SSH) "$(COMPOSE) ps claude-remote-api watchdog 2>/dev/null"
+
+# ── Individual restarts (for precision — prefer `make restart` for most changes) ─
+
+restart-api: ## Rebuild API only — reseed infra tasks, verify
 	$(SSH) "cd $(REPO) && git pull"
 	$(SSH) "sqlite3 $(DB) \"DELETE FROM scheduled_tasks WHERE id IN ($(INFRA_TASKS))\""
 	$(SSH) "cd $(REPO) && $(DOPPLER) $(COMPOSE) build --no-cache claude-remote-api"
@@ -33,14 +46,12 @@ restart-api: ## Pull, rebuild API image, reseed infra tasks, redeploy — verify
 	@sleep 6
 	$(SSH) "sqlite3 $(DB) \"SELECT id, next_run FROM scheduled_tasks WHERE id LIKE 'monitoring-%'\""
 
-# ── Watchdog ───────────────────────────────────────────────────────────────────
-
-restart-watchdog: ## Pull, sync agent instructions, rebuild watchdog, redeploy — verify running
+restart-watchdog: ## Rebuild watchdog only — sync instructions, verify running
 	$(SSH) "cd $(REPO) && git pull"
 	$(SSH) "cp $(INSTRUCTIONS_SRC) $(INSTRUCTIONS_DEST)"
 	$(SSH) "cd $(REPO) && $(DOPPLER) $(COMPOSE) build --no-cache watchdog"
 	$(SSH) "cd $(REPO) && $(DOPPLER) $(COMPOSE) up -d --no-deps watchdog"
-	$(SSH) "$(COMPOSE) ps watchdog"
+	$(SSH) "$(COMPOSE) ps watchdog 2>/dev/null"
 
 # ── VibeKanban ─────────────────────────────────────────────────────────────────
 
