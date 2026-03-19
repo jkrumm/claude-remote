@@ -99,6 +99,8 @@ services:
     restart: unless-stopped
     networks:
       - agent-net
+    group_add:
+      - "988"  # host docker group GID — grants /var/run/docker.sock access
     volumes:
       # Bind mount (not named volume) so watchdog can pass the host-side path to the
       # Docker daemon when spawning agent containers (Docker-in-Docker bind mount fix).
