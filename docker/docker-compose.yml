@@ -118,7 +118,7 @@ services:
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
       # Anthropic API credentials — injected directly into agent containers
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_API_URL=${ANTHROPIC_API_URL}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL}
       # Main chat JID — auto-registers on first boot if no groups configured
       - TELEGRAM_MAIN_CHAT_JID=${TELEGRAM_MAIN_CHAT_JID}
       # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
