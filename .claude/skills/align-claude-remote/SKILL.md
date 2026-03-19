@@ -74,7 +74,23 @@ t.Union([SuccessSchema, t.Object({ error: t.String() })])
 cd /Users/johannes.krumm/SourceRoot/claude-remote/api && bun run typecheck 2>&1 | grep -v "docker.ts:59"
 ```
 
-## Phase 6 — Doc alignment
+## Phase 6 — Validate prompt endpoints in tasks.ts
+
+Read `api/src/routes/tasks.ts`. Extract every URL pattern referenced in HOURLY_PROMPT, MORNING_PROMPT, and EVENING_PROMPT.
+
+For each URL pattern:
+1. Strip the `$CLAUDE_REMOTE_API_URL` prefix and any query params
+2. Resolve path params to their pattern form (e.g. `jkrumm/claude-remote` → `{owner}/{repo}`)
+3. Check the resulting path exists in the live OpenAPI spec (`GET /docs/json`)
+4. Flag any that are missing as **PROMPT_ENDPOINT_DRIFT** — wrong path in a prompt
+
+Also check:
+- Error handling: does each prompt fail loudly (NTFY alert) or silently if a fetch fails?
+- Flag any prompt that has no error handling as **SILENT_FAILURE_RISK**
+
+Fix all **PROMPT_ENDPOINT_DRIFT** issues in tasks.ts before proceeding.
+
+## Phase 7 — Doc alignment (formerly Phase 6)
 
 ### CLAUDE.md
 - Verify the WatchDog section accurately describes current architecture (container context, VCS vs runtime split, monitoring philosophy)
@@ -95,7 +111,7 @@ cd /Users/johannes.krumm/SourceRoot/claude-remote/api && bun run typecheck 2>&1 
 - `/summary` endpoint description: CLAUDE.md is source of truth
 - VCS vs runtime split explanation: CLAUDE.md only
 
-## Phase 7 — Validate
+## Phase 8 — Validate
 
 ```bash
 cd /Users/johannes.krumm/SourceRoot/claude-remote/api && bun run typecheck 2>&1 | grep -v "docker.ts:59"
@@ -103,19 +119,20 @@ cd /Users/johannes.krumm/SourceRoot/claude-remote/api && bun run typecheck 2>&1 
 
 Must pass with zero errors (excluding the known docker.ts:59 line).
 
-## Phase 8 — Commit
+## Phase 9 — Commit
 
 Use conventional commits. Split if needed:
 - `fix(api): replace t.Any() response schemas with typed schemas`
+- `fix(watchdog): correct prompt endpoint paths and add fetch error handling`
 - `docs(watchdog): align CLAUDE.md and agent instructions with current reality`
 
 No AI attribution. No Co-Authored-By footer.
 
-## Phase 9 — Deploy
+## Phase 10 — Deploy
 
-Deploy the API container:
+Deploy the API container (uses Doppler for secrets):
 ```bash
-ssh cr "cd ~/SourceRoot/claude-remote && git pull && cd docker && doppler run -p claude-remote -c prod -- docker compose build --no-cache claude-remote-api && doppler run -p claude-remote -c prod -- docker compose up -d claude-remote-api"
+ssh cr "cd ~/SourceRoot/claude-remote && git pull && make restart-api"
 ```
 
 Sync watchdog instructions (no restart needed — read fresh per container spawn):
@@ -123,7 +140,7 @@ Sync watchdog instructions (no restart needed — read fresh per container spawn
 ssh cr "cd ~/SourceRoot/claude-remote && git pull && cp watchdog/groups/instructions/telegram_main.md ~/watchdog-data/groups/instructions/telegram_main.md"
 ```
 
-## Phase 10 — Verify
+## Phase 11 — Verify
 
 Hit `GET /docs/json` on the live API and confirm no `{}` response schemas remain for the fixed endpoints.
 

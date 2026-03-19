@@ -53,6 +53,10 @@ const HOURLY_PROMPT = `Silent hourly health check. Steps:
    If missing or invalid, initialise: { "last_check": null, "active_issues": {}, "events_24h": [] }
 
 2. Fetch GET $CLAUDE_REMOTE_API_URL/summary with Authorization: Bearer $CLAUDE_REMOTE_API_SECRET
+   If the fetch fails (network error, non-200, or the response body contains a top-level { error } field),
+   send one NTFY alert and stop — do NOT write monitoring_state.json:
+     POST $CLAUDE_REMOTE_API_URL/ntfy/send  Bearer $CLAUDE_REMOTE_API_SECRET
+     { "title": "⚠️ Hourly check failed", "message": "Could not fetch /summary: {error details}", "priority": "high" }
 
 3. Determine current active issues from summary:
    - UptimeKuma monitors where status is not "up"
@@ -90,6 +94,8 @@ const MORNING_PROMPT = `Morning digest. Compose a concise Telegram message for J
 Steps:
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
    → current system health, TickTick due-today + overdue, GitHub open PRs/notifications
+   If the fetch fails (non-200 or { error } in response), send NTFY and stop:
+     { "title": "⚠️ Morning digest failed", "message": "Could not fetch /summary: {error details}", "priority": "high" }
 
 2. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
    → events_24h for overnight activity (since yesterday 23:00)
@@ -116,13 +122,16 @@ Steps:
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
    → GitHub notifications, TickTick tasks, system health
 
-2. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm (Bearer $CLAUDE_REMOTE_API_SECRET)
-   For EVERY repo (not just "active" ones), fetch all commits since today 00:00:
-   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}
-   Collect: commit message, SHA, author date, repo name.
-   Also check pulls merged today:
-   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc
+2. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/user/repos?sort=pushed&per_page=50 (Bearer $CLAUDE_REMOTE_API_SECRET)
+   → list of all repos. If this returns an error (non-200 or { message } field), send NTFY:
+     { "title": "⚠️ Evening report: GitHub fetch failed", "message": "{error details}", "priority": "high" }
+   Then stop — don't proceed with stale/empty data.
+
+   For repos pushed_at >= today 00:00, fetch commits and PRs:
+   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}&per_page=50
+   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=20
    Include PRs where merged_at is today.
+   Collect: commit message, SHA, author date, repo name.
 
 3. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
    → events_24h for today's incidents
