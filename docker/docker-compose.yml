@@ -137,10 +137,9 @@ services:
       - CLAUDE_REMOTE_API_SECRET=${CLAUDE_REMOTE_API_SECRET}
       - VIBEKANBAN_BASE_URL=http://vibekanban:8081
       - DOCKER_HOST=tcp://docker-proxy:2375
-      # Anthropic API credentials (replaces OAuth — no expiry, ToS compliant)
+      # Anthropic API credentials — injected via credential proxy, never exposed to containers
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_API_URL=${ANTHROPIC_API_URL}
-      - ANTHROPIC_API_MODEL=${ANTHROPIC_API_MODEL}
       # HOST_DATA_DIR: host-side path of the /data mount, for DinD bind mount resolution.
       - HOST_DATA_DIR=/home/claude-remote/nanoclaw-data
       # Agent container timeouts: keep below Docker proxy TCP idle (~10min) to avoid orphans.
