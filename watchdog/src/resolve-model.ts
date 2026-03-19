@@ -35,7 +35,7 @@ export async function resolveLatestHaikuModel(): Promise<string> {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     const res = await fetch(`${baseUrl}/v1/models`, {
       signal: controller.signal,
       headers: {
