@@ -55,9 +55,13 @@ export async function resolveLatestHaikuModel(): Promise<string> {
     }
 
     const data = (await res.json()) as { data: AnthropicModel[] };
-    const haikus = data.data.filter((m) =>
-      m.id.toLowerCase().includes('haiku'),
-    );
+    const haikus = data.data
+      .filter((m) => m.id.toLowerCase().includes('haiku'))
+      // Sort newest first by created_at
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
 
     if (haikus.length === 0) {
       logger.warn(
@@ -67,7 +71,6 @@ export async function resolveLatestHaikuModel(): Promise<string> {
       return DEFAULT_HAIKU_MODEL;
     }
 
-    // Anthropic returns models newest-first
     const model = haikus[0].id;
     logger.info(
       { model, haikusFound: haikus.map((m) => m.id) },
