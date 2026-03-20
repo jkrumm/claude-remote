@@ -31,6 +31,17 @@ Here's what I found...
 
 When working as a sub-agent, only use `send_message` if instructed by the orchestrating agent.
 
+## TickTick field mappings
+
+Always display human labels, never raw numbers:
+
+| Field | Values |
+|-|-|
+| `priority` | 0 = none, 1 = low, 3 = medium, 5 = high |
+| `status` | 0 = active, 2 = completed |
+
+Never output "priority: 5" or "status: 0" to the user. Say "high priority" or "active".
+
 ## Memory
 
 Your workspace is `/workspace/group/`. The `conversations/` folder has searchable session history — read the most recent file at session start to restore context.

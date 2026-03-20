@@ -53,9 +53,10 @@ All dates are plain `YYYY-MM-DD` strings — both when reading from the API and 
 - Complete: `POST /ticktick/project/{projectId}/task/{taskId}/complete`
 - Delete: `DELETE /ticktick/project/{projectId}/task/{taskId}`
 
-**Priority scale:** `0`=none, `1`=low, `3`=medium, `5`=high
+**Priority scale:** `0`=none, `1`=low, `3`=medium, `5`=high — always display the label, never the raw number.
+**Status:** `0`=active, `2`=completed — never display raw number to Johannes.
 
-**When listing tasks:** include project name, due date (German short format `18.03.`), and priority. Flag overdue tasks clearly.
+**When listing tasks:** include project name, due date (German short format `18.03.`), and priority label. Flag overdue tasks clearly.
 
 **When creating tasks:** ask which project if ambiguous. If Johannes doesn't specify, check which project name fits (Inbox, Personal, Dev, etc.) — the project list is your guide.
 
