@@ -12,7 +12,7 @@ export const ntfyRoutes = new Elysia({ prefix: '/ntfy' })
   .post(
     '/send',
     async ({ body }) => {
-      await publish(TOPIC, body.title ?? 'ClaudeRemote', body.message, body.priority as Priority | undefined)
+      await publish(TOPIC, body.title ?? 'ClaudeRemote', body.message, body.priority as Priority | undefined, body.tags)
       return { ok: true as const }
     },
     {
@@ -20,6 +20,9 @@ export const ntfyRoutes = new Elysia({ prefix: '/ntfy' })
         message: t.String(),
         title: t.Optional(t.String()),
         priority: t.Optional(t.Number({ minimum: 1, maximum: 5 })),
+        tags: t.Optional(t.Array(t.String(), {
+          description: 'Emoji shortcode tags shown on the notification (e.g. ["red_circle", "warning"]). Uses gemoji names.',
+        })),
       }),
       response: t.Object({ ok: t.Literal(true) }),
       detail: {

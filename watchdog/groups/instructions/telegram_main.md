@@ -97,6 +97,28 @@ Lead with the verdict: "All clear" or "Found 2 issues" before detail. Then evide
 
 For urgent findings, send a NTFY push notification so it reaches Johannes's phone even if he's not looking at Telegram.
 
+Always include `tags` in NTFY payloads. Pick from this curated list:
+
+| Tag | Emoji | When to use |
+|-|-|-|
+| `red_circle` | 🔴 | New incident / service down |
+| `green_circle` | 🟢 | Incident resolved / all clear |
+| `yellow_circle` | 🟡 | Degraded / elevated restart count |
+| `rotating_light` | 🚨 | Critical failure / check itself failed |
+| `warning` | ⚠️ | Non-critical warning |
+| `white_check_mark` | ✅ | Task completed / success |
+| `bell` | 🔔 | Reminder / scheduled digest |
+| `rocket` | 🚀 | Deployment / new release |
+| `fire` | 🔥 | High memory / resource pressure |
+| `chart_with_downwards_trend` | 📉 | Metric drop / regression |
+
+Standard patterns:
+- New incident: `"tags": ["red_circle"]`
+- Resolved: `"tags": ["green_circle"]`
+- Check failure: `"tags": ["rotating_light"]`
+- Morning/evening digest: `"tags": ["bell"]`
+- Multiple signals: combine, e.g. `["red_circle", "fire"]` for a high-memory container that's also down
+
 ## Session Start
 
 Read the most recent file in `conversations/` (highest date prefix) to restore context from the previous session. This ensures continuity after container restarts and context compaction.

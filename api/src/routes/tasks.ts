@@ -56,7 +56,7 @@ const HOURLY_PROMPT = `Silent hourly health check. Steps:
    If the fetch fails (network error, non-200, or the response body contains a top-level { error } field),
    send one NTFY alert and stop — do NOT write monitoring_state.json:
      POST $CLAUDE_REMOTE_API_URL/ntfy/send  Bearer $CLAUDE_REMOTE_API_SECRET
-     { "title": "⚠️ Hourly check failed", "message": "Could not fetch /summary: {error details}", "priority": "high" }
+     { "title": "⚠️ Hourly check failed", "message": "Could not fetch /summary: {error details}", "priority": "high", "tags": ["rotating_light"] }
 
 3. Determine current active issues from summary:
    - UptimeKuma monitors where status is not "up"
@@ -84,10 +84,10 @@ const HOURLY_PROMPT = `Silent hourly health check. Steps:
 
 NTFY alert format:
   POST $CLAUDE_REMOTE_API_URL/ntfy/send  Bearer $CLAUDE_REMOTE_API_SECRET
-  { "title": "⚠️ {label}", "message": "Down since {first_seen formatted as HH:MM}", "priority": "high" }
+  { "title": "⚠️ {label}", "message": "Down since {first_seen formatted as HH:MM}", "priority": "high", "tags": ["red_circle"] }
 
 NTFY resolve format:
-  { "title": "✅ {label} resolved", "message": "Was down {duration, e.g. 23 min}", "priority": "default" }`
+  { "title": "✅ {label} resolved", "message": "Was down {duration, e.g. 23 min}", "priority": "default", "tags": ["green_circle"] }`
 
 const MORNING_PROMPT = `Morning digest. Write a Telegram message that sets Johannes up for the day — what needs attention, what's achievable, what's already burning.
 
@@ -96,7 +96,7 @@ IMPORTANT: Your entire response is the Telegram message. Start directly with �
 ── Data gathering ──────────────────────────────────────────────────────────────
 
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
-   If fetch fails: send NTFY { "title": "⚠️ Morning digest failed", "message": "{error}", "priority": "high" } and stop.
+   If fetch fails: send NTFY { "title": "⚠️ Morning digest failed", "message": "{error}", "priority": "high", "tags": ["rotating_light"] } and stop.
 
 2. Fetch GET $CLAUDE_REMOTE_API_URL/ticktick/projects (Bearer $CLAUDE_REMOTE_API_SECRET)
    → list of all projects (id, name, closed). Skip closed projects.
@@ -156,7 +156,7 @@ Gather ALL of the following before composing. Do not skip sources.
 
 1. SYSTEM OVERVIEW
    GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
-   If fetch fails: send NTFY { "title": "⚠️ Evening report failed", "message": "{error}", "priority": "high" } and stop.
+   If fetch fails: send NTFY { "title": "⚠️ Evening report failed", "message": "{error}", "priority": "high", "tags": ["rotating_light"] } and stop.
 
 2. GITHUB — what got shipped
    GET $CLAUDE_REMOTE_API_URL/github/api/user/repos?sort=pushed&per_page=100

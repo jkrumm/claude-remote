@@ -5,18 +5,19 @@ export async function publish(
   title: string,
   message: string,
   priority: Priority = 3,
+  tags?: string[],
 ) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${process.env.NTFY_TOKEN}`,
+    Title: title,
+    Priority: String(priority),
+    'Content-Type': 'text/plain',
+  }
+  if (tags && tags.length > 0) {
+    headers['Tags'] = tags.join(',')
+  }
   await fetch(
     `${process.env.NTFY_BASE_URL ?? 'https://ntfy.jkrumm.com'}/${topic}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.NTFY_TOKEN}`,
-        Title: title,
-        Priority: String(priority),
-        'Content-Type': 'text/plain',
-      },
-      body: message,
-    },
+    { method: 'POST', headers, body: message },
   )
 }
