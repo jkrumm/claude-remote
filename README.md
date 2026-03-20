@@ -166,7 +166,7 @@ NanoClaw is a **personal assistant** bot — not a coding agent. It runs Claude 
 - Looking things up and reasoning about tasks
 - Delegating coding work to Vibekanban (create a task, which Vibekanban picks up)
 
-Trigger it by starting your message with `@<ASSISTANT_NAME>` (default: `@Andy`).
+Trigger it by starting your message with `@<ASSISTANT_NAME>` (default: `@WatchDog`).
 
 Before it responds, you must register your Telegram chat as the main channel. Send `/chatid` to the bot — it replies with your chat ID in the format `tg:XXXXXXXXX`. Then register it:
 ```bash

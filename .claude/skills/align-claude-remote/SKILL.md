@@ -12,7 +12,7 @@ You are performing a full alignment audit of the `claude-remote` project at `/Us
 Read these files:
 - `CLAUDE.md` — project-level context and conventions
 - `watchdog/groups/instructions/telegram_main.md` — WatchDog behavioral instructions
-- `watchdog/groups/global/CLAUDE.md` — Andy (non-main group) instructions
+- `watchdog/groups/global/CLAUDE.md` — WatchDog (non-main group) instructions
 - `watchdog/CLAUDE.md` — WatchDog quick-context
 
 Scan `README.md` if it exists for stale references.
@@ -102,7 +102,7 @@ Fix all **PROMPT_ENDPOINT_DRIFT** issues in tasks.ts before proceeding.
 - Remove anything already covered verbatim in CLAUDE.md to avoid duplication
 - Monitoring task details (`monitoring-hourly`, etc.) should live in CLAUDE.md, not be duplicated in instructions
 
-### global/CLAUDE.md (Andy)
+### global/CLAUDE.md (WatchDog)
 - Contains `mcp__nanoclaw__send_message` — check if tool name has been updated
 - Trim if it duplicates things covered in telegram_main.md
 

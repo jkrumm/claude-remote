@@ -56,7 +56,7 @@ PAT permissions required:
 # On homelab, with the nanoclaw container running:
 docker exec claude-remote-nanoclaw node dist/index.js register tg:XXXXXXXXX "Your Name" main
 ```
-After registration, trigger the bot with `@Andy <message>` (or whatever `ASSISTANT_NAME` you set).
+After registration, trigger the bot with `@WatchDog <message>` (or whatever `ASSISTANT_NAME` you set).
 **Status**: DONE ✓
 
 ---

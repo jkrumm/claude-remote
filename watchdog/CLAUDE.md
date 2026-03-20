@@ -19,7 +19,7 @@ Single Node.js process with Telegram channel. Messages route to Claude Agent SDK
 | `src/task-scheduler.ts` | Runs scheduled tasks |
 | `src/db.ts` | SQLite operations |
 | `groups/instructions/{name}.md` | Behavioral instructions injected as system prompt for that group |
-| `groups/global/CLAUDE.md` | Base context for non-main groups (Andy) |
+| `groups/global/CLAUDE.md` | Base context for non-main groups (WatchDog) |
 | `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
 
 ## Skills
