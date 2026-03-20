@@ -89,83 +89,159 @@ NTFY alert format:
 NTFY resolve format:
   { "title": "✅ {label} resolved", "message": "Was down {duration, e.g. 23 min}", "priority": "default" }`
 
-const MORNING_PROMPT = `Morning digest. Compose a concise Telegram message for Johannes.
+const MORNING_PROMPT = `Morning digest. Write a Telegram message that sets Johannes up for the day — what needs attention, what's achievable, what's already burning.
 
-Steps:
+IMPORTANT: Your entire response is the Telegram message. Start directly with 🌅. No preamble.
+
+── Data gathering ──────────────────────────────────────────────────────────────
+
 1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
-   → current system health, TickTick due-today + overdue, GitHub open PRs/notifications
-   If the fetch fails (non-200 or { error } in response), send NTFY and stop:
-     { "title": "⚠️ Morning digest failed", "message": "Could not fetch /summary: {error details}", "priority": "high" }
+   If fetch fails: send NTFY { "title": "⚠️ Morning digest failed", "message": "{error}", "priority": "high" } and stop.
 
-2. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
-   → events_24h for overnight activity (since yesterday 23:00)
+2. Fetch GET $CLAUDE_REMOTE_API_URL/ticktick/projects (Bearer $CLAUDE_REMOTE_API_SECRET)
+   → list of all projects (id, name, closed). Skip closed projects.
 
-3. Format and send the following as your response (Telegram markdown rules apply):
+   For each open project, fetch GET $CLAUDE_REMOTE_API_URL/ticktick/project/{id}/data
+   From .data.tasks collect:
+   - Overdue: dueDate < today AND status != 2 (not completed)
+   - Due today: dueDate = today AND status != 2
+   - Due this week: dueDate within next 7 days AND status != 2
+   Sort by priority (5=high > 3=medium > 1=low > 0=none), then by dueDate.
+
+3. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/notifications (Bearer $CLAUDE_REMOTE_API_SECRET)
+   → open PRs needing attention, review requests, mentions.
+   Also fetch open PRs across active repos if notifications reference them.
+
+4. Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
+   → active_issues (currently open), events_24h since 23:00 yesterday (overnight events).
+
+5. Read evening_context.json from CWD if it exists
+   → what was flagged last night (don't re-explain things that haven't changed).
+
+── Message format ───────────────────────────────────────────────────────────────
 
 🌅 Good morning — {DD.MM.YY}
 
-**System** {one line: "All healthy" or "N issues: list them briefly"}
-**Overnight** {events from events_24h since 23:00 yesterday, or "Quiet night"}
-**Today** {TickTick tasks due today, max 5 — title + project, no padding}
-**Backlog** {overdue count if any, open PRs count — skip section if both zero}
+{One sentence framing the day: what's the shape of it? E.g. "Light on todos, good day to push on [project]." or "Heavy backlog — triage first."}
 
-Rules:
-- Under 20 lines total
-- Skip sections that have no content
-- Dates in German short format (18.03.)
-- Use **bold** for section headers, bullet lists for items
-- No markdown tables, no ## headings`
+**Today** {Due today, sorted by priority — title + project. If none due today, skip to This Week section.}
 
-const EVENING_PROMPT = `Evening wrap-up. Write a Telegram message for Johannes that reads like a proper end-of-day debrief — not a bullet dump, not a novel.
+**This Week** {Due in next 7 days if useful context — max 5, title + project. Skip if Today already has 5+ items.}
 
-IMPORTANT: Your entire response is the Telegram message. Do not add preamble, do not say "Here is your report" or "Done!". Start directly with the 🌙 emoji.
+**Backlog** {Overdue count grouped by project if > 0. Top 2–3 most urgent by priority. Skip if none.}
 
-Steps:
-1. Fetch GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
-   → GitHub notifications, TickTick tasks, system health
+**Open PRs** {GitHub PRs needing attention — title + repo. Skip if none.}
 
-2. Fetch GET $CLAUDE_REMOTE_API_URL/github/api/user/repos?sort=pushed&per_page=50 (Bearer $CLAUDE_REMOTE_API_SECRET)
-   If error (non-200 or { message } field): send NTFY { "title": "⚠️ Evening report: GitHub fetch failed", "message": "{error}", "priority": "high" } and stop.
+**Overnight** {monitoring events since 23:00 yesterday from events_24h. Skip if quiet.}
 
-   For every repo where pushed_at >= today 00:00, fetch:
-   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}&per_page=50
-   GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=20
-   Collect commits and PRs merged today (merged_at is today).
+**System** {One line: "All clear ✅" or list active_issues with brief status.}
 
-3. Read monitoring_state.json from /workspace/group/monitoring_state.json → events_24h for today.
+── Strategy (only when today has ≤ 2 tasks due) ──────────────────────────────
+If Johannes has fewer than 3 tasks due today, add a short section:
+**Focus suggestion** — look across all TickTick projects at high/medium priority tasks not yet due. Pick 1–2 that seem strategically valuable based on project and task content. Suggest them briefly: "{task title} ({project}) — could be a good one for today."
 
-4. Compose the message:
+── Rules ───────────────────────────────────────────────────────────────────────
+- Motivating but grounded — not cheerleader energy, just clarity
+- Skip sections with no content
+- Dates in German short format (19.03.)
+- Bold section headers, bullets for items
+- No tables, no ## headings`
 
----
+const EVENING_PROMPT = `Evening wrap-up. Write a Telegram message that genuinely reflects Johannes's full day — code, tasks, infra, incidents. Not just GitHub. Everything.
+
+IMPORTANT: Your entire response is the Telegram message. Start directly with 🌙. No preamble, no "Done!", no "Here is your report".
+
+── Data gathering ──────────────────────────────────────────────────────────────
+Gather ALL of the following before composing. Do not skip sources.
+
+1. SYSTEM OVERVIEW
+   GET $CLAUDE_REMOTE_API_URL/summary (Bearer $CLAUDE_REMOTE_API_SECRET)
+   If fetch fails: send NTFY { "title": "⚠️ Evening report failed", "message": "{error}", "priority": "high" } and stop.
+
+2. GITHUB — what got shipped
+   GET $CLAUDE_REMOTE_API_URL/github/api/user/repos?sort=pushed&per_page=100
+   For every repo where pushed_at >= today 00:00:
+     GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/commits?since={today_00:00_ISO}&per_page=100
+     GET $CLAUDE_REMOTE_API_URL/github/api/repos/jkrumm/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=20
+   Collect: all commits today, PRs merged today (merged_at = today).
+   Also check open PRs still pending: pulls?state=open — note which repos have PRs waiting.
+
+3. TICKTICK — tasks done and still pending
+   GET $CLAUDE_REMOTE_API_URL/ticktick/projects → all projects
+   For each open project, GET $CLAUDE_REMOTE_API_URL/ticktick/project/{id}/data
+   Collect from .data.tasks:
+   - Completed today: completedTime >= today 00:00 AND status = 2
+   - Still overdue: dueDate < today AND status != 2
+   - Due tomorrow: dueDate = tomorrow AND status != 2
+   - Due this week: dueDate within next 7 days AND status != 2
+   Sort all pending by priority (5=high > 3=medium > 1=low), then dueDate.
+
+4. DOCKER HEALTH
+   GET $CLAUDE_REMOTE_API_URL/docker/homelab/containers
+   GET $CLAUDE_REMOTE_API_URL/docker/vps/containers
+   Note: containers with restart_count > 0, status not "running", or that recovered today.
+   Compare with monitoring_state.json active_issues to identify improvements vs new problems.
+
+5. NTFY — alerts today
+   GET $CLAUDE_REMOTE_API_URL/ntfy/messages
+   Note high-priority alerts that fired today. Distinguish: still open vs resolved.
+
+6. MONITORING STATE
+   Read monitoring_state.json from CWD (/workspace/group/monitoring_state.json)
+   → events_24h: all incidents that started or resolved today.
+
+7. YESTERDAY'S CONTEXT
+   Read evening_context.json from CWD if it exists.
+   → What was flagged yesterday as pending/unresolved. Don't repeat unchanged things verbatim — either note they're still open or that they improved.
+
+── Message format ───────────────────────────────────────────────────────────────
+
 🌙 Day wrap — {DD.MM.YY}
 
-{One sentence characterising the day — e.g. "Heavy session." / "Solid output." / "Quiet but focused." Base it on total commit count and nature of work.}
+{One sentence characterising the full day — based on total commits + tasks done + incidents. E.g. "Heavy infra day — 40 commits and a nasty debugging session." or "Good mix — code shipped, tasks cleared." Be specific, not generic.}
 
-**Shipped**
-For each repo that had commits today, write 2–4 lines:
-- **{repo name}** — {N commits}{, PR merged if applicable}
-  {1–2 sentences describing what the work actually was — what problem was solved, what feature landed, what got refactored. Read the commit messages to infer this. Don't just list them.}
-  {If a PR was merged: ✅ {PR title}}
+**Shipped** (skip if nothing committed today)
+For each repo with commits, 2–4 lines:
+• **{repo}** — {N commits}{, ✅ PR merged if applicable}
+  {1–2 sentences: what did the work actually accomplish? Read commit messages and infer the arc. Don't list them — summarise the intent.}
+If PRs are still open after today's work: mention them briefly at the end of the section.
 
-If nothing shipped: "Quiet day — rest is productive too."
+**Tasks done** (skip if none completed today)
+{Completed TickTick tasks today, grouped by project — title only. If many: "N tasks cleared across {projects}."}
+
+**Still pending**
+{Overdue tasks: count + top 2–3 by priority — title + project.}
+{Due tomorrow: title + project, max 3.}
+Skip entirely if nothing overdue and nothing due tomorrow.
 
 **Incidents** (skip if none)
-{For each event in events_24h today: one line per issue — what happened and how long it lasted if resolved.}
+{Events from events_24h today. For resolved: what happened + duration. For ongoing: what's still open.}
+{If something that was broken yesterday is now stable: note the improvement — e.g. "claude-remote-electric stable since 22:00 after 21 restarts."}
 
 **System**
-{One line: "All clear ✅" or list containers with elevated restart counts.}
+{Docker and UptimeKuma health. "All clear ✅" or specific containers with restart_count > 5 or down status. Note improvements explicitly.}
 
-**Tomorrow** (skip if nothing due)
-{TickTick tasks due tomorrow, max 4, one per line — title + project.}
----
-
-Tone rules:
-- Warm but not gushing. Like a colleague who was watching the work happen.
-- If total commits > 20: say so and mean it. That's a serious day.
-- If it was mostly debugging/infra: acknowledge the grind explicitly.
-- Never robotic. Never just a list of commit messages.
+── Rules ───────────────────────────────────────────────────────────────────────
+- Warm but not gushing. Like a colleague who actually watched the day unfold.
+- If total commits > 20 across repos: call it out — that's serious output.
+- Completed tasks count as real work, not a footnote.
+- If infra was burning and got fixed: that's the story of the day, say so.
+- Don't repeat things from yesterday's evening_context that haven't changed.
+- Skip sections with nothing to show — don't pad with "Quiet" if quiet.
 - Dates in German short format (19.03.)
-- Bold for section headers and repo names. No markdown tables, no ## headings.`
+- Bold section headers and repo names. No tables, no ## headings.
+
+── After sending ────────────────────────────────────────────────────────────────
+Save evening_context.json to CWD with:
+{
+  "date": "{today ISO date}",
+  "commits_today": {total count},
+  "repos_touched": ["{repo}", ...],
+  "tasks_completed": ["{title}", ...],
+  "open_issues": ["{key}", ...],  // from monitoring_state active_issues
+  "pending_prs": ["{repo}: {title}", ...],
+  "overdue_tasks": ["{title} ({project})", ...]
+}`
 
 interface InfraTaskDef {
   id: string
