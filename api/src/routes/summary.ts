@@ -56,6 +56,15 @@ function settle<T>(r: PromiseSettledResult<T>): T | { error: string } {
     : { error: r.reason instanceof Error ? r.reason.message : String(r.reason) }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ])
+}
+
 // ─── Fetchers ────────────────────────────────────────────────────────────────
 
 async function fetchDockerSummary(proxyUrl: string): Promise<DockerSummary> {
@@ -491,7 +500,7 @@ export const summaryRoute = new Elysia().get(
   async (): Promise<any> => {
     const [kumaResult, dockerHLResult, dockerVPSResult, ntfyResult, githubResult, ticktickResult, tasksResult, vibeKanbanResult] =
       await Promise.allSettled([
-        fetchMonitors().then((monitors) => {
+        withTimeout(fetchMonitors().then((monitors) => {
           const nonGroup = monitors.filter((m) => m.type !== 'group')
           return {
             up: nonGroup.filter((m) => m.status === 1).length,
@@ -502,14 +511,14 @@ export const summaryRoute = new Elysia().get(
               .filter((m) => m.status === 0)
               .map((m) => ({ name: m.name, type: m.type, uptime1d: m.uptime1d })),
           }
-        }),
-        fetchDockerSummary(process.env.DOCKER_PROXY_URL_HOMELAB ?? 'http://docker-proxy:2375'),
-        fetchDockerSummary(process.env.DOCKER_PROXY_URL_VPS ?? ''),
-        fetchNtfySummary(),
-        fetchGitHubSummary(),
-        fetchTickTickSummary(),
+        }), 10_000, 'uptimeKuma'),
+        withTimeout(fetchDockerSummary(process.env.DOCKER_PROXY_URL_HOMELAB ?? 'http://docker-proxy:2375'), 10_000, 'dockerHomelab'),
+        withTimeout(fetchDockerSummary(process.env.DOCKER_PROXY_URL_VPS ?? ''), 10_000, 'dockerVps'),
+        withTimeout(fetchNtfySummary(), 10_000, 'ntfy'),
+        withTimeout(fetchGitHubSummary(), 15_000, 'github'),
+        withTimeout(fetchTickTickSummary(), 15_000, 'ticktick'),
         Promise.resolve(fetchTasksSummary()),
-        fetchVibeKanbanSummary(),
+        withTimeout(fetchVibeKanbanSummary(), 10_000, 'vibeKanban'),
       ])
 
     return {
